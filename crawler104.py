@@ -29,7 +29,11 @@ def get_values(selected, mapping):
     codes = [mapping[item] for item in selected]
     values = ','.join(map(str, codes))
     return values
-
+    
+# def get_jobs_link(filter_jobs:list):
+#         jobs_link = [f"https:{item['href']}" for item in filter_jobs]
+#         return jobs_link
+    
 class Crawler104():
     today = datetime.now().date()
     headers = {
@@ -115,10 +119,6 @@ class Crawler104():
         # 在title裡頭依照關鍵字來做篩選
         filter_jobs = [i for i in raw_jobs if re.search(self.key_word, i['title'].lower())]
         print(f'過濾後剩{len(filter_jobs)}筆資料', end=" | ")
-        return filter_jobs
+        return filter_job
 
-
-
-
-
-        
+    
