@@ -2,10 +2,10 @@
 
 import json
 
-def get_filter_params(role, keyword, selected_cities, isnew, selected_jobexp, model, order, asc):
+def get_filter_params(*args):
 
-    def get_values(selected, mapping):
-        codes = [mapping[item] for item in selected]
+    def get_values(value, mappings):
+        codes = [mappings[key][item] for item in value if item in mappings[key]]
         values = ','.join(map(str, codes))
         return values
     
@@ -13,25 +13,22 @@ def get_filter_params(role, keyword, selected_cities, isnew, selected_jobexp, mo
     with open('./config/search_params_mapping.json', 'r', encoding='utf-8') as file:
         mappings = json.load(file)
 
-    # custom filter search
-    role_code = mappings['ro_mapping'].get(role)
-    area = get_values(selected_cities, mappings['city_mapping'])
-    isnew_code = mappings['isnew_mapping'].get(isnew)
-    jobexp = get_values(selected_jobexp, mappings['jobexp_mapping'])
-    model_code = mappings['model_mapping'].get(model)
-    order_code = mappings['order_mapping'].get(order)
-    asc_code = mappings['asc_mapping'].get(asc)
+    filter_params = {}
+    for dict in args:
+        key = next(iter(dict), None)
+        value = dict[key]
+        # print(key,value)
 
-    filter_params = {
-        'ro': role_code,
-        'keyword': keyword,
-        'area': area,
-        'isnew': isnew_code,
-        'jobexp': jobexp,
-        'mode': model_code,
-        'order': order_code,
-        'asc': asc_code,
-    }
+        if key in mappings:
+            if isinstance(value, list):
+                # If the value is a list, apply the mapping to each element
+                mapped_values = get_values(value,mappings)
+                filter_params[key] = mapped_values
+            else:
+                # If the value is not a list, apply the mapping directly
+                filter_params[key] = mappings[key].get(value, value)
+        else:
+            filter_params[key] = value
 
     return filter_params
 
