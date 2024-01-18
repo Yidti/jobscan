@@ -119,6 +119,6 @@ class Crawler104():
         # 在title裡頭依照關鍵字來做篩選
         filter_jobs = [i for i in raw_jobs if re.search(self.key_word, i['title'].lower())]
         print(f'過濾後剩{len(filter_jobs)}筆資料', end=" | ")
-        return filter_job
+        return filter_jobs
 
     
