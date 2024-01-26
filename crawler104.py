@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import time
 import re, time, json, requests, random
 from tqdm import tqdm
 from datetime import datetime
@@ -10,6 +12,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
+import threaded_async_job
+from datetime import datetime
+import os
+import xlsxwriter
 # import grequests # 看起要在.py才能用
 
 # 非同步HTTP請求
@@ -30,9 +36,6 @@ def get_values(selected, mapping):
     values = ','.join(map(str, codes))
     return values
     
-# def get_jobs_link(filter_jobs:list):
-#         jobs_link = [f"https:{item['href']}" for item in filter_jobs]
-#         return jobs_link
     
 class Crawler104():
     today = datetime.now().date()
@@ -41,11 +44,13 @@ class Crawler104():
     }
     url = 'https://www.104.com.tw/jobs/search/?'
     
-    def __init__(self, filter_params, key_word, page = 15):
+    def __init__(self, filter_params, page = 15):
         self.filter_params = filter_params
-        self.key_word = key_word
         self.page = page
-
+        self.df_company = pd.DataFrame()
+        self.df_industry = pd.DataFrame()
+        self.df_jobs = pd.DataFrame()
+        
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
@@ -55,7 +60,7 @@ class Crawler104():
         option = Options()
         option.add_argument(f"user-agent={self.headers['User-Agent']}")
         option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        # option.add_argument('--headless')
+        option.add_argument('--headless')
         # option.add_argument("--disable-gpu")
         return webdriver.Chrome(options=option)
 
@@ -99,26 +104,174 @@ class Crawler104():
 
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
                 total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
-
-                self.load_pages(driver, total_page, scroll_times=15)
+                # 讀取所有頁面
+                # self.load_pages(driver, total_page, scroll_times=15)
 
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
-                raw_jobs = soup.find_all("a", class_="js-job-link")
-                print(f'載入{len(raw_jobs)}筆資料', end=" | ")
-
+                # 讀取所有 job item
+                # raw_jobs = soup.find_all("a", class_="js-job-link")
+                raw_jobs = soup.find_all("article", class_="js-job-item")
+                result_items = self.get_job_items(raw_jobs)
+                company_items,industry_items,job_items = result_items
+                
+                print(f'載入{len(job_items)}筆資料', end=" | ")
                 driver.quit()
-                return raw_jobs
+                return result_items
             except Exception as e:
                 retry_count += 1
-                print(f'執行錯誤, retry {retry_count}')
+                print(f'執行錯誤, retry {retry_count}, {e}')
 
         print('達到重試上限，放棄爬取')
-        return []
+        return None
 
-    def filter_job(self, raw_jobs:list):
-        # 在title裡頭依照關鍵字來做篩選
-        filter_jobs = [i for i in raw_jobs if re.search(self.key_word, i['title'].lower())]
-        print(f'過濾後剩{len(filter_jobs)}筆資料', end=" | ")
-        return filter_jobs
+    def get_job_items(self, raw_jobs):
+        company_items = {}
+        industry_items = {}
+        job_items = {}
+        
+        for article in raw_jobs:
+        
+            # article
+            # 公司 company
+            company_no = int(article.get("data-cust-no"))
+            company_name = article.get("data-cust-name")
+            company_link = article.find('li', class_='job-mode__company').find('a')['href']
+            company_link= f"https:{company_link.split('?')[0]}"
+            company_title = article.find('li', class_='job-mode__company').find('a').get('title')
+            company_address = re.search(r'公司住址：(.+)', company_title).group(1)
+
+            # 產業 industry
+            industry_no = int(article.get("data-indcat"))
+            industry_name = article.get("data-indcat-desc")
+            
+            # 工作 job
+            job_no = int(article.get("data-job-no"))
+            job_name = article.get("data-job-name")
+            job_link_element = article.find("a", class_="js-job-link")
+            job_link = job_link_element.get("href")
+            job_link= f"https:{job_link.split('?')[0]}"
+            job_exp = article.find('li', class_='job-mode__exp').text
+            job_edu = article.find('li', class_='job-mode__edu').text
+            job_area = article.find('li', class_='job-mode__area').text
+
+            # 收集 item
+             # 檢查並加入 company_items
+            if company_no not in company_items:
+                company_items[company_no] = {
+                    # "id": company_no,
+                    "公司": company_name,
+                    "連結": company_link,
+                    "地址": company_address,
+                }
+            else:
+                # print(f"{company_name}({company_no}) repeated ")
+                pass
+            
+            # 檢查並加入 industry_items
+            if industry_no not in industry_items:
+                industry_items[industry_no] = {
+                    # "id": industry_no,
+                    "產業": industry_name
+                }
+            else:
+                # print(f"{industry_name}({industry_no}) repeated ")
+                pass
+            
+            # 檢查並加入 job_items
+            if job_no not in job_items:
+                job_items[job_no] = {
+                    # "id": job_no,
+                    "職缺": job_name,
+                    "連結": job_link,
+                    "公司": company_no,
+                    "地區": job_area,
+                    "產業": industry_no,
+                    "經歷": job_exp,
+                    "學歷": job_edu,
+                    
+                }
+            else:
+                # print(f"{job_name}({job_no}) repeated ")
+                pass
+
+        return company_items,industry_items,job_items
 
     
+    def filter_job(self, job_items:tuple, job_keywords:tuple=()):
+        filtered_job = job_items.copy()
+        keyword_pattern = '|'.join(map(re.escape, job_keywords))
+
+        # 使用临时列表存储要删除的键
+        job_keys_to_delete = []
+        
+        for key, content in filtered_job.items():
+            # print(key, content['職缺'])
+            if not re.search(keyword_pattern, content['職缺'].lower()):
+                job_keys_to_delete.append(key)
+        
+        # 在循环之外删除不符合条件的键
+        for key in job_keys_to_delete:
+            del filtered_job[key]
+        print(f'過濾剩{len(filtered_job)}筆資料', end=" | ")
+
+        return filtered_job
+
+    def run(self, job_keywords:tuple=()):
+        start_time = time.time()
+        result_items = self.search_job()
+        # result 包含 company, industry, job (dictionary)
+        company_items, industry_items, job_items = result_items
+        filtered_jobs = self.filter_job(job_items, job_keywords)
+        print(f"花費 {np.round((time.time() - start_time),2)} 秒")
+
+        # transfer to df and save in object
+        self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
+        self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
+        self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
+
+        return filtered_jobs
+    
+    def detail(self, filtered_jobs: dict):
+        start_time = time.time()
+        jobs_details = threaded_async_job.scraper(filtered_jobs)
+        print(f"花費 {np.round((time.time() - start_time),2)} 秒")
+        # 更新 df_jobs
+        self.df_jobs = pd.DataFrame.from_dict(jobs_details, orient='index')
+        # 重新排序column
+        # columns=[
+        #         "更新", "職缺", "連結", "公司", "地區" , "工作內容", "職務類別",
+        #         "工作待遇", "工作性質", "上班地點", "管理責任",
+        #         "出差外派", "上班時段", "休假制度", "可上班日",
+        #         "需求人數", "工作經歷", "學歷要求", "科系要求",
+        #         "語文條件", "擅長工具", "工作技能", "其他條件",
+        #         "公司福利", 
+        #         ]
+        # self.df_jobs = self.df_jobs[columns]
+        return jobs_details
+
+    def export(self, user:str):
+
+        df_jobs_output = self.df_jobs.copy()
+        df_jobs_output['公司'] = df_jobs_output['公司'].replace(self.df_company['公司'].to_dict())
+        df_jobs_output['產業'] = df_jobs_output['產業'].replace(self.df_industry['產業'].to_dict())
+        
+        current_date = datetime.now().date()    
+        user = user
+        counter = 1
+        
+        output_filename = f'output/{user}_{current_date}.xlsx'
+        base_filename = f"{user}_{current_date}"
+        
+        df_jobs_output.replace(r'=\w+', '', regex=True, inplace=True)
+        
+        while os.path.exists(output_filename):
+            output_filename = f'output/{user}_{current_date}_{counter}.xlsx'
+            base_filename = f"{user}_{current_date}_{counter}"
+            counter += 1
+        
+        try:
+            df_jobs_output.to_excel(output_filename, sheet_name=base_filename, index=False, engine='xlsxwriter')
+            print(f"CSV文件保存成功: {output_filename}")
+        except PermissionError as e:
+            print(f"无法保存文件: {e}")
+            
