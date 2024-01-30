@@ -105,15 +105,12 @@ class Crawler104():
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
                 total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
                 # 讀取所有頁面
-                # self.load_pages(driver, total_page, scroll_times=15)
-
+                self.load_pages(driver, total_page, scroll_times=15)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 # 讀取所有 job item
-                # raw_jobs = soup.find_all("a", class_="js-job-link")
                 raw_jobs = soup.find_all("article", class_="js-job-item")
                 result_items = self.get_job_items(raw_jobs)
                 company_items,industry_items,job_items = result_items
-                
                 print(f'載入{len(job_items)}筆資料', end=" | ")
                 driver.quit()
                 return result_items
@@ -137,8 +134,18 @@ class Crawler104():
             company_name = article.get("data-cust-name")
             company_link = article.find('li', class_='job-mode__company').find('a')['href']
             company_link= f"https:{company_link.split('?')[0]}"
-            company_title = article.find('li', class_='job-mode__company').find('a').get('title')
-            company_address = re.search(r'公司住址：(.+)', company_title).group(1)
+            company_title_element = article.find('li', class_='job-mode__company').find('a')
+            company_title = company_title_element.get('title')
+            # 移除空白字符和換行
+            company_title = company_title.replace('\n', '').strip()
+            pattern = r'.*公司(?:住址|地址)：(.+)'
+            # 使用正則表達式搜尋"公司地址："之後的所有內容
+            match = re.search(pattern, company_title)
+
+            if match:
+                job_address = match.group(1).strip()
+            else:
+                job_address = None
 
             # 產業 industry
             industry_no = int(article.get("data-indcat"))
@@ -152,16 +159,23 @@ class Crawler104():
             job_link= f"https:{job_link.split('?')[0]}"
             job_exp = article.find('li', class_='job-mode__exp').text
             job_edu = article.find('li', class_='job-mode__edu').text
+            # 地區area = 縣市county/city + 區域region 
             job_area = article.find('li', class_='job-mode__area').text
-
+            pattern = r'(.+?[市縣])(.+?[區鎮])?'
+            area_match = re.match(pattern ,job_area)
+            if area_match: 
+                job_city = area_match.group(1)
+                job_region = area_match.group(2)
+            else: 
+                job_city = job_area
+                job_region = None
             # 收集 item
              # 檢查並加入 company_items
             if company_no not in company_items:
                 company_items[company_no] = {
                     # "id": company_no,
                     "公司": company_name,
-                    "連結": company_link,
-                    "地址": company_address,
+                    "link": company_link,
                 }
             else:
                 # print(f"{company_name}({company_no}) repeated ")
@@ -182,13 +196,15 @@ class Crawler104():
                 job_items[job_no] = {
                     # "id": job_no,
                     "職缺": job_name,
-                    "連結": job_link,
                     "公司": company_no,
-                    "地區": job_area,
+                    "link": job_link,
+                    # "地區": job_area,
+                    "縣市": job_city,
+                    "區域": job_region,
+                    "地址": job_address,
                     "產業": industry_no,
                     "經歷": job_exp,
                     "學歷": job_edu,
-                    
                 }
             else:
                 # print(f"{job_name}({job_no}) repeated ")
@@ -222,6 +238,7 @@ class Crawler104():
         # result 包含 company, industry, job (dictionary)
         company_items, industry_items, job_items = result_items
         filtered_jobs = self.filter_job(job_items, job_keywords)
+        
         print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
         # transfer to df and save in object
@@ -238,20 +255,20 @@ class Crawler104():
         # 更新 df_jobs
         self.df_jobs = pd.DataFrame.from_dict(jobs_details, orient='index')
         # 重新排序column
-        # columns=[
-        #         "更新", "職缺", "連結", "公司", "地區" , "工作內容", "職務類別",
-        #         "工作待遇", "工作性質", "上班地點", "管理責任",
-        #         "出差外派", "上班時段", "休假制度", "可上班日",
-        #         "需求人數", "工作經歷", "學歷要求", "科系要求",
-        #         "語文條件", "擅長工具", "工作技能", "其他條件",
-        #         "公司福利", 
-        #         ]
-        # self.df_jobs = self.df_jobs[columns]
+        columns=["更新", "職缺","公司", "link",'縣市', "區域", "地址", "產業", "經歷", "學歷",
+        "內容", "類別", "科系", "語文", "工具", "技能", "其他",
+         "待遇", "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利" ]
+        self.df_jobs = self.df_jobs[columns]
         return jobs_details
 
     def export(self, user:str):
 
         df_jobs_output = self.df_jobs.copy()
+        # 匯入company link的資料 
+        df_jobs_output = pd.merge(df_jobs_output, self.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_jobs', '_company'))
+
+
+        # 將id取代成name
         df_jobs_output['公司'] = df_jobs_output['公司'].replace(self.df_company['公司'].to_dict())
         df_jobs_output['產業'] = df_jobs_output['產業'].replace(self.df_industry['產業'].to_dict())
         

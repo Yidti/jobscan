@@ -188,25 +188,25 @@ def get_content(soup, job_item):
     
     # 2024.01.24 更新字典細節
     job_content["更新"] = job_datePosted
-    job_content["工作內容"] = job_description
-    job_content["職務類別"] = job_category
-    job_content["工作待遇"] = job_salary
-    job_content["工作性質"] = job_type
+    job_content["內容"] = job_description
+    job_content["類別"] = job_category
+    job_content["待遇"] = job_salary
+    job_content["性質"] = job_type
     # job_content["上班地點"] = job_location
-    job_content["管理責任"] = job_responsibility
-    job_content["出差外派"] = job_business_trip
-    job_content["上班時段"] = job_office_hours
-    job_content["休假制度"] = job_vacation
-    job_content["可上班日"] = job_available_start
-    job_content["需求人數"] = job_vacancy
+    job_content["管理"] = job_responsibility
+    job_content["出差"] = job_business_trip
+    job_content["時段"] = job_office_hours
+    job_content["休假"] = job_vacation
+    job_content["可上"] = job_available_start
+    job_content["人數"] = job_vacancy
     # job_content["工作經歷"] = job_work_experience
     # job_content["學歷要求"] = job_educational_requirements
-    job_content["科系要求"] = job_major_requirements
-    job_content["語文條件"] = job_language_proficiency
-    job_content["擅長工具"] = job_tools_proficiency
-    job_content["工作技能"] = job_skills
-    job_content["其他條件"] = job_additional_qualifications
-    job_content["公司福利"] = job_company_benefits
+    job_content["科系"] = job_major_requirements
+    job_content["語文"] = job_language_proficiency
+    job_content["工具"] = job_tools_proficiency
+    job_content["技能"] = job_skills
+    job_content["其他"] = job_additional_qualifications
+    job_content["福利"] = job_company_benefits
 
     return job_item
 
@@ -240,7 +240,7 @@ async def get_info(jobs_batch):
 async def fetch(job_item, driver):
 
     # 抓取job_item裏頭的連結
-    link = job_item[1]['連結']
+    link = job_item[1]['link']
     try:
         # 最多重试3次
         for retry in range(3):
