@@ -287,8 +287,22 @@ class Crawler104():
             counter += 1
         
         try:
-            df_jobs_output.to_excel(output_filename, sheet_name=base_filename, index=False, engine='xlsxwriter')
+            df_jobs_output.to_excel(output_filename, sheet_name=base_filename, index=True, index_label='id', engine='xlsxwriter')
             print(f"CSV文件保存成功: {output_filename}")
         except PermissionError as e:
             print(f"无法保存文件: {e}")
+
+
+        # output_filename = f'output_{current_date}.csv'
+        # counter = 1
+        
+        # while os.path.exists(output_filename):
+        #     output_filename = f'output_{current_date}_{counter}.csv'
+        #     counter += 1
+        
+        # try:
+        #     all_df.to_csv(output_filename, index=False, encoding='utf-8-sig')
+        #     print(f"CSV文件保存成功: {output_filename}")
+        # except PermissionError as e:
+        #     print(f"无法保存文件: {e}")
             

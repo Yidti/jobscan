@@ -149,42 +149,7 @@ def get_content(soup, job_item):
     # 23.連結
     job_link = data_list[0]['itemListElement'][2]['item']
     
-    # data = {
-    #     "更新": [job_datePosted],
-    #     "職缺": [job_position],
-    #     "公司": [job_company],
-    #     "工作內容": [job_description],
-    #     "職務類別": [job_category],
-    #     "工作待遇": [job_salary],
-    #     "工作性質": [job_type],
-    #     "上班地點": [job_location],
-    #     "管理責任": [job_responsibility],
-    #     "出差外派": [job_business_trip],
-    #     "上班時段": [job_office_hours],
-    #     "休假制度": [job_vacation],
-    #     "可上班日": [job_available_start],
-    #     "需求人數": [job_vacancy],
-    #     "工作經歷": [job_work_experience],
-    #     "學歷要求": [job_educational_requirements],
-    #     "科系要求": [job_major_requirements],
-    #     "語文條件": [job_language_proficiency],
-    #     "擅長工具": [job_tools_proficiency],
-    #     "工作技能": [job_skills],
-    #     "其他條件": [job_additional_qualifications],
-    #     "公司福利": [job_company_benefits],
-    #     "連結": [job_link]
-    # }
-    print(f"{job_position} | {job_company} | {job_datePosted}")
-    # columns=[
-    # "更新", "職缺", "公司", "工作內容", "職務類別",
-    # "工作待遇", "工作性質", "上班地點", "管理責任",
-    # "出差外派", "上班時段", "休假制度", "可上班日",
-    # "需求人數", "工作經歷", "學歷要求", "科系要求",
-    # "語文條件", "擅長工具", "工作技能", "其他條件",
-    # "公司福利", "連結"
-    # ]
-    # df = pd.DataFrame(data, columns=columns)
-    # df.to_csv('output999.csv', index=False, encoding='utf-8-sig')
+    # print(f"{job_position} | {job_company} | {job_datePosted}")
     
     # 2024.01.24 更新字典細節
     job_content["更新"] = job_datePosted
@@ -210,7 +175,7 @@ def get_content(soup, job_item):
 
     return job_item
 
-async def get_info(jobs_batch):
+async def get_info(jobs_batch, progress_bar):
     # jobs_list = [f"https:{item['href']}" for item in jobs_list]
     # jobs_list = [url.split('?')[0] for url in jobs_list]
 
@@ -226,7 +191,7 @@ async def get_info(jobs_batch):
     # for link in jobs_list:
     for job_item in jobs_batch:
         async with semaphore:
-            task = asyncio.create_task(fetch(job_item, driver))
+            task = asyncio.create_task(fetch(job_item, driver, progress_bar))
             tasks.append(task)
     
     results = await asyncio.gather(*tasks)
@@ -237,7 +202,7 @@ async def get_info(jobs_batch):
 
  
 
-async def fetch(job_item, driver):
+async def fetch(job_item, driver, progress_bar):
 
     # 抓取job_item裏頭的連結
     link = job_item[1]['link']
@@ -250,7 +215,8 @@ async def fetch(job_item, driver):
                 
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 job_item_detail = get_content(soup, job_item)
-            
+                progress_bar.update(1)
+
                 return job_item_detail
             
             except Exception as e:
