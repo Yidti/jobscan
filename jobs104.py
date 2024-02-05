@@ -205,14 +205,13 @@ async def get_info(jobs_batch, progress_bar):
 async def fetch(job_item, driver, progress_bar):
 
     # 抓取job_item裏頭的連結
-    link = job_item[1]['link']
+    link = job_item[1]['職缺_link']
     try:
         # 最多重试3次
         for retry in range(3):
             try:
                 driver.get(link)
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
-                
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 job_item_detail = get_content(soup, job_item)
                 progress_bar.update(1)

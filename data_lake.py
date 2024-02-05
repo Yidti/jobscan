@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from datetime import datetime
 import pymongo
+from crawler104 import Crawler104
 # from pandas import DataFrame
 
 class DataLake():
@@ -10,13 +11,24 @@ class DataLake():
         self.noSQL_DB_name = "job_db"
         self.collection_name = "jobs_104"
 
-    def upload_to_nosql(self, user):
-        df = self.load_excel(user)
+    def upload_nosql(self, user, crawler:Crawler104):
+        # df = self.load_excel(user)
+
+        current_date = datetime.now().date()
+        crawler.df_jobs['data stamp'] = current_date.strftime('%Y-%m-%d')
+
+        df_jobs = crawler.df_jobs.copy()
+        df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
+        df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
+        df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))
+        
+        self.upload_collection(df_jobs, self.collection_name)
+    
+    def upload_collection(self, df, collection_name):
         client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = client[self.noSQL_DB_name]
-        collection = db[self.collection_name]
-        current_date = datetime.now().date()
-        df['data stamp'] = current_date.strftime('%Y-%m-%d')
+        collection = db[collection_name]
+        
         data = df.reset_index().to_dict(orient="records")
 
         new_count, update_count = 0, 0
@@ -34,7 +46,8 @@ class DataLake():
             except Exception as e:
                 print(f"{idx},{e}")
                 
-        print(f'更新{update_count}筆, 新增{new_count}筆')
+        print(f'Update {update_count} records, Insert {new_count} records in {collection_name} collection')
+
 
     
     def load_excel(self, user):

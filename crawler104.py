@@ -13,7 +13,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
 import threaded_async_job
-from datetime import datetime
 import os
 import xlsxwriter
 # import grequests # 看起要在.py才能用
@@ -44,11 +43,12 @@ class Crawler104():
     }
     url = 'https://www.104.com.tw/jobs/search/?'
     
-    def __init__(self, filter_params, page = 15):
+    def __init__(self, filter_params, user="", page = 15):
         self.filter_params = filter_params
+        self.user = user
         self.page = page
-        self.df_company = pd.DataFrame()
-        self.df_industry = pd.DataFrame()
+        # self.df_company = pd.DataFrame()
+        # self.df_industry = pd.DataFrame()
         self.df_jobs = pd.DataFrame()
         
     def fetch_url(self):
@@ -109,21 +109,33 @@ class Crawler104():
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 # 讀取所有 job item
                 raw_jobs = soup.find_all("article", class_="js-job-item")
-                result_items = self.get_job_items(raw_jobs)
-                company_items,industry_items,job_items = result_items
+                job_items = self.get_job_items(raw_jobs)
+                # company_items,industry_items,job_items = result_items
                 print(f'載入{len(job_items)}筆資料', end=" | ")
                 driver.quit()
-                return result_items
+
+                # result 包含 company, industry, job (dictionary)
+                # company_items, industry_items, job_items = result_items 
+                # transfer to df and save in object
+                # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
+                # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
+                self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
+        
+                # self.df_company.index.name = 'id'
+                # self.df_industry.index.name = 'id'
+                self.df_jobs.index.name = 'id'
+
+                return True
             except Exception as e:
                 retry_count += 1
                 print(f'執行錯誤, retry {retry_count}, {e}')
 
         print('達到重試上限，放棄爬取')
-        return None
+        return False
 
     def get_job_items(self, raw_jobs):
-        company_items = {}
-        industry_items = {}
+        # company_items = {}
+        # industry_items = {}
         job_items = {}
         
         for article in raw_jobs:
@@ -150,7 +162,6 @@ class Crawler104():
             # 產業 industry
             industry_no = int(article.get("data-indcat"))
             industry_name = article.get("data-indcat-desc")
-            
             # 工作 job
             job_no = int(article.get("data-job-no"))
             job_name = article.get("data-job-name")
@@ -169,126 +180,158 @@ class Crawler104():
             else: 
                 job_city = job_area
                 job_region = None
-            # 收集 item
-             # 檢查並加入 company_items
-            if company_no not in company_items:
-                company_items[company_no] = {
-                    # "id": company_no,
-                    "公司": company_name,
-                    "link": company_link,
-                }
-            else:
-                # print(f"{company_name}({company_no}) repeated ")
-                pass
             
-            # 檢查並加入 industry_items
-            if industry_no not in industry_items:
-                industry_items[industry_no] = {
-                    # "id": industry_no,
-                    "產業": industry_name
-                }
-            else:
-                # print(f"{industry_name}({industry_no}) repeated ")
-                pass
+            # # 收集 item
+            #  # 檢查並加入 company_items
+            # if company_no not in company_items:
+            #     company_items[company_no] = {
+            #         # "id": company_no,
+            #         "公司": company_name,
+            #         "link": company_link,
+            #     }
+            # else:
+            #     # print(f"{company_name}({company_no}) repeated ")
+            #     pass
+            
+            # # 檢查並加入 industry_items
+            # if industry_no not in industry_items:
+            #     industry_items[industry_no] = {
+            #         # "id": industry_no,
+            #         "產業": industry_name
+            #     }
+            # else:
+            #     # print(f"{industry_name}({industry_no}) repeated ")
+            #     pass
             
             # 檢查並加入 job_items
             if job_no not in job_items:
                 job_items[job_no] = {
-                    # "id": job_no,
                     "職缺": job_name,
-                    "公司": company_no,
-                    "link": job_link,
+                    "職缺_link": job_link,
+                    "公司_id":company_no,
+                    "公司": company_name,
+                    "公司_link": company_link,
+                    "產業_id": industry_no,
+                    "產業": industry_name,
                     # "地區": job_area,
                     "縣市": job_city,
                     "區域": job_region,
                     "地址": job_address,
-                    "產業": industry_no,
                     "經歷": job_exp,
                     "學歷": job_edu,
                 }
             else:
                 # print(f"{job_name}({job_no}) repeated ")
                 pass
-
-        return company_items,industry_items,job_items
+                
+        return job_items
+        # return company_items,industry_items,job_items
 
     
-    def filter_job(self, job_items:tuple, job_keywords:tuple=()):
+    def filter_job(self, job_items:pd.DataFrame, job_keywords=(), company_exclude=()):
         filtered_job = job_items.copy()
-        keyword_pattern = '|'.join(map(re.escape, job_keywords))
-
-        # 使用临时列表存储要删除的键
         job_keys_to_delete = []
+
+        # keyword_pattern = '|'.join(map(re.escape, job_keywords))
+        # 職缺篩選條件
+        if job_keywords:
+            for key, row in filtered_job.iterrows():
+                if not any(keyword in row['職缺'] for keyword in job_keywords):
+                    job_keys_to_delete.append(key)
+                    
+        # 公司排除條件
+        if company_exclude:
+            for key, row in filtered_job.iterrows():
+                if any(company in row['公司'] for company in company_exclude):
+                    job_keys_to_delete.append(key)
+        # 去除重複的索引
+        job_keys_to_delete = list(set(job_keys_to_delete))
+        # 刪除符合條件的行
+        filtered_job.drop(job_keys_to_delete, inplace=True)
         
-        for key, content in filtered_job.items():
-            # print(key, content['職缺'])
-            if not re.search(keyword_pattern, content['職缺'].lower()):
-                job_keys_to_delete.append(key)
-        
-        # 在循环之外删除不符合条件的键
-        for key in job_keys_to_delete:
-            del filtered_job[key]
         print(f'過濾剩{len(filtered_job)}筆資料', end=" | ")
 
         return filtered_job
 
-    def run(self, job_keywords:tuple=()):
+    def run(self, job_keywords=(), company_exclude=()):
         start_time = time.time()
-        result_items = self.search_job()
+        # result_items = self.search_job()
+        self.search_job()
         # result 包含 company, industry, job (dictionary)
-        company_items, industry_items, job_items = result_items
-        filtered_jobs = self.filter_job(job_items, job_keywords)
+        # company_items, industry_items, job_items = result_items
+        self.df_jobs = self.filter_job(self.df_jobs, job_keywords, company_exclude)
         
         print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
-        # transfer to df and save in object
-        self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
-        self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
-        self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
+        # # transfer to df and save in object
+        # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
+        # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
+        # self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
 
-        return filtered_jobs
+        # self.df_company.index.name = 'id'
+        # self.df_industry.index.name = 'id'
+        # self.df_jobs.index.name = 'id'
+
+        # return filtered_jobs
     
-    def detail(self, filtered_jobs: dict):
-        start_time = time.time()
-        jobs_details = threaded_async_job.scraper(filtered_jobs)
-        print(f"花費 {np.round((time.time() - start_time),2)} 秒")
-        # 更新 df_jobs
-        self.df_jobs = pd.DataFrame.from_dict(jobs_details, orient='index')
-        # 重新排序column
-        columns=["更新", "職缺","公司", "link",'縣市', "區域", "地址", "產業", "經歷", "學歷",
-        "內容", "類別", "科系", "語文", "工具", "技能", "其他",
-         "待遇", "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利" ]
-        self.df_jobs = self.df_jobs[columns]
-        return jobs_details
+    def detail(self):
 
-    def export(self, user:str):
+        if self.df_jobs is not None:
+        
+            start_time = time.time()
+            jobs_details = threaded_async_job.scraper(self.df_jobs)
+            print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
 
-        df_jobs_output = self.df_jobs.copy()
+            # 更新 df_jobs
+            self.df_jobs = pd.DataFrame.from_dict(jobs_details, orient='index')
+            self.df_jobs.index.name = 'id'
+            # 重新排序column
+            columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
+                     "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
+                     "語文", "工具", "技能", "其他", "待遇", 
+                     "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利" ]
+            self.df_jobs = self.df_jobs[columns]
+            print(f"花費 {np.round((time.time() - start_time),2)} 秒")
+
+        # return jobs_details
+
+    def export_excel(self):
+        user = self.user
+        df_jobs_output = self.df_jobs
         # 匯入company link的資料 
-        df_jobs_output = pd.merge(df_jobs_output, self.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_jobs', '_company'))
-
+        # df_jobs_output = pd.merge(df_jobs_output, self.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_jobs', '_company'))
 
         # 將id取代成name
-        df_jobs_output['公司'] = df_jobs_output['公司'].replace(self.df_company['公司'].to_dict())
-        df_jobs_output['產業'] = df_jobs_output['產業'].replace(self.df_industry['產業'].to_dict())
+        # df_jobs_output['公司'] = df_jobs_output['公司'].replace(self.df_company['公司'].to_dict())
+        # df_jobs_output['產業'] = df_jobs_output['產業'].replace(self.df_industry['產業'].to_dict())
+
+        column_list = ["公司_id", "產業_id"]
+        for column_to_drop in column_list:
+            if column_to_drop in df_jobs_output.columns:
+                df_jobs_output = df_jobs_output.drop(column_to_drop,axis= 1)
+
         
         current_date = datetime.now().date()    
-        user = user
         counter = 1
+
+        if user =="":
+            filename = f"{current_date}"
+        else:
+            filename = f"{user}_{current_date}"
+
+        output_path = f'output/{filename}.xlsx'
         
-        output_filename = f'output/{user}_{current_date}.xlsx'
-        base_filename = f"{user}_{current_date}"
         
-        df_jobs_output.replace(r'=\w+', '', regex=True, inplace=True)
-        
-        while os.path.exists(output_filename):
-            output_filename = f'output/{user}_{current_date}_{counter}.xlsx'
-            base_filename = f"{user}_{current_date}_{counter}"
+        while os.path.exists(output_path):
+            filename = filename + f"_{counter}"
+            output_path = f'output/{filename}.xlsx'
             counter += 1
-        
+
+        df_jobs_output.replace(r'=\w+', '', regex=True, inplace=True)
+
         try:
-            df_jobs_output.to_excel(output_filename, sheet_name=base_filename, index=True, index_label='id', engine='xlsxwriter')
-            print(f"CSV文件保存成功: {output_filename}")
+            df_jobs_output.to_excel(output_path, sheet_name=filename, index=True, index_label='id', engine='xlsxwriter')
+            print(f"CSV文件保存成功: {output_path}")
         except PermissionError as e:
             print(f"无法保存文件: {e}")
 

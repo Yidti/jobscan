@@ -26,12 +26,13 @@ def process_batch(jobs, start_idx, end_idx, all_results, progress_bar):
     all_results.extend(results)
 
 def scraper(jobs):
+    # 把dataframe轉成dictionary
+    jobs_dict = jobs.to_dict(orient='index')
     # 把dictionary轉成list
-    jobs = list(jobs.items())
+    jobs = list(jobs_dict.items())
     # all_df = pd.DataFrame()
     all_dict = {}
     current_date = datetime.now().date()    
-    print(f"jobs:{len(jobs)}")
     
     # 每個 batch 的 size (非同步每個 batch 處理)
     batch_size = 50
