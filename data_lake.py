@@ -10,17 +10,18 @@ class DataLake():
     def __init__(self):
         self.noSQL_DB_name = "job_db"
         self.collection_name = "jobs_104"
+        self.df_jobs = pd.DataFrame()
 
-    def upload_nosql(self, user, crawler:Crawler104):
+    def export_nosql(self, user, crawler:Crawler104):
         # df = self.load_excel(user)
 
         current_date = datetime.now().date()
         crawler.df_jobs['data stamp'] = current_date.strftime('%Y-%m-%d')
 
         df_jobs = crawler.df_jobs.copy()
-        df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
-        df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
-        df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))
+        # df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
+        # df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
+        # df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))
         
         self.upload_collection(df_jobs, self.collection_name)
     
@@ -47,6 +48,13 @@ class DataLake():
                 print(f"{idx},{e}")
                 
         print(f'Update {update_count} records, Insert {new_count} records in {collection_name} collection')
+
+    def load(self):
+        client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = client[self.noSQL_DB_name]
+        collection = db[collection_name]
+        
+
 
 
     
