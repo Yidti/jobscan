@@ -219,8 +219,8 @@ async def fetch(job_item, driver, progress_bar):
                 return job_item_detail
             
             except Exception as e:
-                print(f"Error loading {link}, Error: {e}, retrying...")
-    
+                # print(f"Error loading {link}, Error: {e}, retrying...")
+                pass
         return None
 
     except Exception as e:

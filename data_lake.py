@@ -23,12 +23,12 @@ class DataLake():
         # df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
         # df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))
         
-        self.upload_collection(df_jobs, self.collection_name)
+        self.upload_collection(df_jobs)
     
-    def upload_collection(self, df, collection_name):
+    def upload_collection(self, df):
         client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = client[self.noSQL_DB_name]
-        collection = db[collection_name]
+        collection = db[self.collection_name]
         
         data = df.reset_index().to_dict(orient="records")
 
@@ -47,16 +47,37 @@ class DataLake():
             except Exception as e:
                 print(f"{idx},{e}")
                 
-        print(f'Update {update_count} records, Insert {new_count} records in {collection_name} collection')
+        print(f'Update {update_count} records, Insert {new_count} records in {self.collection_name} collection')
 
     def load(self):
         client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = client[self.noSQL_DB_name]
-        collection = db[collection_name]
+        collection = db[self.collection_name]
         
 
 
+    def filter(self, job_keywords=(), company_exclude=()):
+        client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = client[self.noSQL_DB_name]
+        collection = db[self.collection_name]
+        
+        def run_job_keywords(collection, job_keywords):
+            # 構建正則表達式
+            regex_pattern = '|'.join(job_keywords)
+            # 刪除不符合關鍵字的文件
+            delete_query = {'職缺': {'$not': {'$regex': regex_pattern, '$options': 'i'}}}
+            delete_result = collection.delete_many(delete_query)
+            print("job keywords - 已刪除不符合關鍵字的文件數量:", delete_result.deleted_count)
 
+        def run_company_exclude(collection, company_exclude):
+            # 構建要刪除的文件的查詢條件
+            delete_query = {'公司': {'$in': company_exclude}}
+            # 刪除符合條件的文件
+            delete_result = collection.delete_many(delete_query)
+            print("company exclude - 已刪除符合條件的文件數量:", delete_result.deleted_count)
+        
+        run_job_keywords(collection, job_keywords)
+        run_company_exclude(collection, company_exclude)
     
     def load_excel(self, user):
         # Load excel
