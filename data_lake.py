@@ -49,11 +49,24 @@ class DataLake():
                 
         print(f'Update {update_count} records, Insert {new_count} records in {self.collection_name} collection')
 
-    def load(self):
+    def load_latest(self):
         client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = client[self.noSQL_DB_name]
         collection = db[self.collection_name]
         
+        stamp = collection.find_one(
+            filter= {}, # 返回集合中的所有文檔
+            sort=[("data stamp", -1)], # 按照字段進行降序排序。 -1 表示降序排列，1 表示升序排列
+            projection={"_id": 0, "data stamp": 1}) # 指定了返回的文檔中的欄位, 0 表示排除, 1代表返回
+        latest_stamp = stamp['data stamp']
+        data_list = list(collection.find({"data stamp": {"$eq": latest_stamp}})) #  $eq（equal to）操作符
+        if data_list:
+            df_jobs = pd.DataFrame(data_list)
+            df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
+            df_jobs = df_jobs.drop(["_id", "data stamp"], axis = 1)
+        
+        return df_jobs
+    
 
 
     def filter(self, job_keywords=(), company_exclude=()):
