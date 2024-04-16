@@ -10,15 +10,15 @@ class DataLake():
     def __init__(self):
         self.noSQL_DB_name = "job_db"
         self.collection_name = "jobs_104"
-        self.df_jobs = pd.DataFrame()
+        self.df_jobs_details = pd.DataFrame()
 
-    def export_nosql(self, user, crawler:Crawler104):
+    def save_nosql(self, user, crawler:Crawler104):
         # df = self.load_excel(user)
 
         current_date = datetime.now().date()
-        crawler.df_jobs['data stamp'] = current_date.strftime('%Y-%m-%d')
+        crawler.df_jobs_details['data stamp'] = current_date.strftime('%Y-%m-%d')
 
-        df_jobs = crawler.df_jobs.copy()
+        df_jobs = crawler.df_jobs_details.copy()
         # df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
         # df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
         # df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))

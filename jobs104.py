@@ -11,6 +11,7 @@ import numpy as np
 import json
 import html
 import re
+from datetime import datetime
 
 headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
@@ -180,7 +181,6 @@ async def get_info(jobs_batch, progress_bar):
     # jobs_list = [url.split('?')[0] for url in jobs_list]
 
     # jobs_list = [item[1]['連結'] for item in jobs_batch]
-    
     tasks = []
     # 在異步任務之外初始化 WebDriver 實例
     driver = webdriver.Chrome(options=option)
@@ -202,13 +202,21 @@ async def get_info(jobs_batch, progress_bar):
 
  
 
-async def fetch(job_item, driver, progress_bar):
+def export_parquet(df):
+        # add Parquet file (exclude)
+        current_date = datetime.now().date()    
+        parquet_file = f"exclude-{current_date}.parquet" 
+        parquet_path = f"temp/{parquet_file}"
+        # 将 DataFrame 存储为 Parquet 文件
+        df.to_parquet(parquet_path, index=True)
 
+
+async def fetch(job_item, driver, progress_bar):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
     try:
-        # 最多重试3次
-        for retry in range(3):
+        # 最多重试2次
+        for retry in range(2):
             try:
                 driver.get(link)
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
@@ -219,9 +227,14 @@ async def fetch(job_item, driver, progress_bar):
                 return job_item_detail
             
             except Exception as e:
-                # print(f"Error loading {link}, Error: {e}, retrying...")
                 pass
-        return None
+                # print(f"Error loading {link}, Error: {e}, retrying...")
+        
+        job_item_dic = {job_item[0]: dict(job_item[1])}
+        df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
+        df_job_item.index.name = 'id'
+        export_parquet(df_job_item)
+        print(f"exclude {job_item[0]}")
 
     except Exception as e:
         print(f"Error: {e}")

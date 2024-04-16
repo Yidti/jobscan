@@ -55,13 +55,24 @@ def scraper(jobs):
         # 等待所有线程完成
         for thread in threads:
             thread.join()
-    
+
+    # 修正error 職缺關閉的問題(detail會撈不到資料)
     for batch in all_results:
-        try:
-            batch_dict = dict(batch)
-            all_dict.update(batch_dict)
-        except Exception as e:
-            print(f"There is an error when trying to convert to a dictionary: {e}")
+        for item in batch:
+            if item is None:
+                continue
+            try:
+                item_dict = {item[0]: dict(item[1])}
+                all_dict.update(item_dict)
+            except TypeError as e:
+                print(f"Error converting element to dictionary: {e}")
+                print(item)
+    # for batch in all_results:
+    #     try:
+    #         batch_dict = dict(batch)
+    #         all_dict.update(batch_dict)
+    #     except Exception as e:
+    #         print(f"There is an error when trying to convert to a dictionary: {e}")
     
     return all_dict
 

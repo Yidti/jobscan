@@ -50,6 +50,7 @@ class Crawler104():
         # self.df_company = pd.DataFrame()
         # self.df_industry = pd.DataFrame()
         self.df_jobs = pd.DataFrame()
+        self.df_jobs_details = pd.DataFrame()
         
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
@@ -278,19 +279,25 @@ class Crawler104():
 
     
     def detail(self):
-        
+
         if self.df_jobs is not None:
         
             start_time = time.time()
 
-            # 讀取 parquet 暫存檔 避免重複抓取
-            df_exist = self.read_parquet()
+            # 讀取 parquet 暫存檔 避免重複抓取 (已經爬過 & 關閉的職缺)
+            df_exist = self.read_parquet(self.user)
+            df_close = self.read_parquet("exclude")
             # 抓取detail目標
             df_scrape = self.df_jobs.copy()
+            
             if df_exist is not None:
                 # 过滤掉存在于 df_exist 中的 id
                 df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
-                print(f"Remove from parquet, leaving {len(df_scrape)} remaining to scrape .")
+            if df_close is not None:
+                # 过滤掉存在于 df_close 中的 id
+                df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
+            print(f"exclude exist and close data")    
+            print(f"Remove from parquet, leaving {len(df_scrape)} remaining to scrape .")
             
             jobs_details = threaded_async_job.scraper(df_scrape)
             print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
@@ -298,14 +305,15 @@ class Crawler104():
             df_jobs_details.index.name = 'id'
 
             # 爬虫爬取到的 jobs_details 放入 df_exist 中
-            self.df_jobs = pd.concat([df_exist, df_jobs_details])
-            
+            # self.df_jobs = pd.concat([df_exist, df_jobs_details])
+            self.df_jobs_details = pd.concat([df_exist, df_jobs_details])
+
             # 重新排序column
             columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
                      "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
                      "語文", "工具", "技能", "其他", "待遇", 
                      "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利" ]
-            self.df_jobs = self.df_jobs[columns]
+            self.df_jobs_details = self.df_jobs_details[columns]
 
             # 儲存到暫存檔(會覆蓋今天的紀錄)
             self.export_parquet()
@@ -319,27 +327,31 @@ class Crawler104():
         parquet_file = f"{self.user}-{current_date}.parquet" 
         parquet_path = f"temp/{parquet_file}"
         # 将 DataFrame 存储为 Parquet 文件
-        self.df_jobs.to_parquet(parquet_path, index=True)
+        self.df_jobs_details.to_parquet(parquet_path, index=True)
         
 
-    def read_parquet(self):
+    def parquet_path(self, string):
         current_date = datetime.now().date()    
-        parquet_file = f"{self.user}-{current_date}.parquet" 
+        parquet_file = f"{string}-{current_date}.parquet" 
         parquet_path = f"temp/{parquet_file}"
+        return parquet_path
+    
+    def read_parquet(self, name):
+        path = self.parquet_path(name)
         try:
         # 尝试读取 Parquet 文件
-            df_exist = pd.read_parquet(parquet_path)
+            df_exist = pd.read_parquet(path)
             return df_exist
         except FileNotFoundError:
         # 如果文件不存在，则打印消息并返回 None
-            print(f"Parquet file '{parquet_path}' not found.")
+            print(f"Parquet file '{path}' not found.")
             return None
 
 
     
     def export_excel(self):
         user = self.user
-        df_jobs_output = self.df_jobs
+        df_jobs_output = self.df_jobs_details
         # 匯入company link的資料 
         # df_jobs_output = pd.merge(df_jobs_output, self.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_jobs', '_company'))
 

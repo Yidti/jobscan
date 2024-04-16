@@ -4,6 +4,7 @@ from translation import translation_dict
 from sqlalchemy import create_engine
 import urllib.parse
 import pandas as pd
+from data_lake import DataLake
 
 
 
@@ -11,10 +12,14 @@ class DataWarehouse():
     def __init__(self):
         # 'dimension.sql' & 'facts.sql'
         self.sql_script={}
-
+        self.df = pd.DataFrame()
+        
+    # 先從NoSQL抓資料dataframe
+    def save_sql(self, data_lake:DataLake):
+        self.df = data_lake.load_latest()
     
-    # 將 df 裏頭的某個 column 放到 dimension 的 table裏頭
-    def 
+    # 將data lake資料放到dimension 的 table裏頭
+    # def run
 
     
         
