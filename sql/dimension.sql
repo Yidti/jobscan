@@ -7,9 +7,11 @@
 
 
 
--- 經歷
-CREATE TABLE IF NOT EXISTS working_exp(  
+-- experience = 經歷 (eg: 1年, 2年)
+CREATE TABLE IF NOT EXISTS experience(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    year_exp VARCHAR(10) NOT NULL,
-    UNIQUE (year_exp)
+    exp_year VARCHAR(10) NOT NULL,
+    UNIQUE (exp_year)
 );
+
+
