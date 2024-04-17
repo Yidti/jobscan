@@ -1,5 +1,5 @@
 translation_dict = {
-    '更新': 'update',
+    '更新': 'update_date',
     '職缺': 'position',
     '職缺_link': 'position_link',
     '公司_id': 'company_id',
