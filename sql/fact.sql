@@ -10,8 +10,10 @@
     -- company_name = 公司名稱
     -- company_link = 公司_link
 
--- industry_id = 產業_id
--- industry = 產業
+-- industry_id = 產業  (dimention table: industry)  
+    -- industry_id = 產業_id
+    -- industry_name = 產業
+
 -- city = 縣市
 -- region = 區域
 -- address = 地址
@@ -39,7 +41,6 @@
 
 
 -- position_link = 職缺_link
-
 CREATE TABLE IF NOT EXISTS job_info (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     id_job INT NOT NULL,
@@ -47,9 +48,11 @@ CREATE TABLE IF NOT EXISTS job_info (
     position VARCHAR(255) NOT NULL,
     position_link VARCHAR(255),
     company_id BIGINT NOT NULL,
+    industry_id BIGINT NOT NULL,
     content TEXT,
     exp_id INT NOT NULL,
-    UNIQUE (id_job, company_id, exp_id),
+    UNIQUE (id_job, company_id, industry_id, exp_id),
     FOREIGN KEY (company_id) REFERENCES company(company_id),
+    FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
     FOREIGN KEY (exp_id) REFERENCES experience(id)
 );
