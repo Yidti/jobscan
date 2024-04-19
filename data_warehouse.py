@@ -56,41 +56,47 @@ class DataWarehouse(metaclass=SingletonMeta):
 
 
     def update_fact_sql(self, df_new, table_name):
+        df_new.reset_index(inplace=True)
+        df_new.rename(columns={'id': 'job_id'}, inplace=True)
+        df_new = self.replace_all_foreign_key(df_new)
         # 選擇要存入的 columns
-        selected = ['update_date','position','position_link','company_id',
-                    'industry_id','content', 'experience']
-        selected_columns = df_new.loc[:, selected]
-        selected_columns.reset_index(inplace=True)
-        selected_columns.rename(columns={'id': 'id_job'}, inplace=True)
-
-        selected_columns = self.replace_all_foreign_key(selected_columns)
+        selected =['job_id','update_date','position','position_link',
+                   'company_id','industry_id','location_id',
+                   'content', 'experience_id']
+        df_new = df_new.loc[:, selected]
         # 儲存至sql (排除重複的id)
-        self.insert_sql(selected_columns, "job_info", "id_job")
+        self.insert_sql(df_new, "job_info", "job_id")
 
 
-    def replace_all_foreign_key(self, selected_columns):
+    def replace_all_foreign_key(self, df_new):
         # 將 data 部分欄位取代成 dimension 的外鍵 foreign key
         table_name = "experience"
-        merge = ['experience','exp_year']
-        rename = {'experience': 'exp_id'}
-        selected_columns = self.replace_foreign_key(selected_columns, table_name, merge, rename)
+        merge = [['experience'],['experience_year']]
+        drop = ['experience','experience_year']
+        rename = {'id': 'experience_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+
+        table_name = "location"
+        merge = [['city','region'],['city','region']]
+        drop = ['city','region']
+        rename = {'id': 'location_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
         
-        return selected_columns
+        return df_new
     
-    def replace_foreign_key(self, selected_columns, table_name, merge, rename):
+    def replace_foreign_key(self, df_new,table_name, merge, drop, rename):
         existing = self.read_sql(table_name)
-        selected_columns = selected_columns.merge(existing, left_on=merge[0], right_on=merge[1], how='left')
-        selected_columns[table_name] = selected_columns['id']
-        selected_columns.drop(columns=['id', merge[1]], inplace=True)
-        selected_columns = selected_columns.rename(columns=rename)
-        return selected_columns
+        df_new = df_new.merge(existing, left_on=merge[0], right_on=merge[1], how='left')
+        df_new.drop(columns = drop, inplace=True)
+        df_new = df_new.rename(columns=rename)
+        return df_new
 
     def update_all_dimension(self, df_new):
         # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
         table_name = "experience"
         selected_columns = ["experience"]
-        rename = {"experience":"exp_year"}
-        id_name = ["exp_year"]
+        rename = {"experience":"experience_year"}
+        id_name = ["experience_year"]
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
         
         table_name = "company"
@@ -105,11 +111,11 @@ class DataWarehouse(metaclass=SingletonMeta):
         id_name = ["industry_id","industry_name"]
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
     
-        # table_name = "location"
-        # selected_columns = ['city', 'region']
-        # rename = {"city":"city_name","region":"region_name"}
-        # id_name = ['city', 'region']
-        # self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        table_name = "location"
+        selected_columns = ['city', 'region']
+        rename = {}
+        id_name = ['city', 'region']
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
 
 
     def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
@@ -126,20 +132,14 @@ class DataWarehouse(metaclass=SingletonMeta):
         existing_data = existing_data[id_name]
 
         # 檢查要寫入的資料是否已存在於目標表中
-        merged_data = pd.concat([selected_columns, existing_data])
-        unique_data = merged_data.drop_duplicates()
-        insert_data = unique_data[~unique_data[id_name].isin(existing_data[id_name])]
-
-        
-        # duplicate_rows = selected_columns[selected_columns[id_name].isin(existing_data[id_name])]
-        # 找出要寫入的資料中不重複的值
-        # insert_data = selected_columns[~selected_columns[id_name].isin(existing_data[id_name])]
-        # insert_data = insert_data.dropna(subset=id_name, how='all')
+        df_merge = pd.merge(selected_columns,existing_data, on=id_name, how="left", indicator=True)
+        df_insert = df_merge[df_merge['_merge'] == 'left_only']
+        df_insert = df_insert.drop('_merge', axis=1)
 
         # 如果有不重複的值，將其寫入目標表
-        if not insert_data.empty:
-            insert_data.to_sql(name=table_name, con=self.engine, if_exists='append', index=False)
-            print(f"不重複的值已成功寫入{table_name}目標表, 寫入{len(insert_data)}筆")
+        if not df_insert.empty:
+            df_insert.to_sql(name=table_name, con=self.engine, if_exists='append', index=False)
+            print(f"不重複的值已成功寫入{table_name}目標表, 寫入{len(df_insert)}筆")
         else:
             print(f"所有要寫入的值都已存在於{table_name}目標表中，無需進行寫入")
             

@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS company(
     UNIQUE (company_id)
 );
 
--- industry_id = 產業_id
--- industry = 產業
+-- industry table
+    -- industry_id = 產業_id
+    -- industry = 產業
 CREATE TABLE IF NOT EXISTS industry(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     industry_id BIGINT NOT NULL,
@@ -20,9 +21,9 @@ CREATE TABLE IF NOT EXISTS industry(
     UNIQUE (industry_id)
 );
 
-
--- city = 縣市
--- region = 區域
+-- location table
+    -- city = 縣市
+    -- region = 區域
 CREATE TABLE IF NOT EXISTS location(
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     city VARCHAR(255) NOT NULL,
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS location(
 -- experience = 經歷 (eg: 1年, 2年)
 CREATE TABLE IF NOT EXISTS experience(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    exp_year VARCHAR(10) NOT NULL,
-    UNIQUE (exp_year)
+    experience_year VARCHAR(10) NOT NULL,
+    UNIQUE (experience_year)
 );
 
