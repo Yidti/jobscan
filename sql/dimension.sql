@@ -39,3 +39,30 @@ CREATE TABLE IF NOT EXISTS experience(
     UNIQUE (experience_year)
 );
 
+-- education = 教育 (eg: 學士, 碩士)
+CREATE TABLE IF NOT EXISTS education(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    education VARCHAR(10) NOT NULL,
+    UNIQUE (education)
+);
+
+-- category = 分類 (eg: 軟體工程師.....)
+CREATE TABLE IF NOT EXISTS category(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    category VARCHAR(255) NOT NULL,
+    UNIQUE (category)
+);
+
+-- major = 分類 (eg: 資訊工程相關.....)
+CREATE TABLE IF NOT EXISTS major(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    major VARCHAR(255) NOT NULL,
+    UNIQUE (major)
+);
+
+-- major = 分類 (eg: 資訊工程相關.....)
+CREATE TABLE IF NOT EXISTS language(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    language VARCHAR(100) NOT NULL,
+    UNIQUE (language)
+);

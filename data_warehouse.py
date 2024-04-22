@@ -61,8 +61,9 @@ class DataWarehouse(metaclass=SingletonMeta):
         df_new = self.replace_all_foreign_key(df_new)
         # 選擇要存入的 columns
         selected =['job_id','update_date','position','position_link',
-                   'company_id','industry_id','location_id',
-                   'content', 'experience_id']
+                   'company_id','industry_id','location_id','address',
+                   'experience_id','education_id', 'content','category_id',
+                  'major_id','language_id', 'tool']
         df_new = df_new.loc[:, selected]
         # 儲存至sql (排除重複的id)
         self.insert_sql(df_new, "job_info", "job_id")
@@ -70,16 +71,38 @@ class DataWarehouse(metaclass=SingletonMeta):
 
     def replace_all_foreign_key(self, df_new):
         # 將 data 部分欄位取代成 dimension 的外鍵 foreign key
+        table_name = "location"
+        merge = [['city','region'],['city','region']]
+        drop = ['city','region']
+        rename = {'id': 'location_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+
         table_name = "experience"
         merge = [['experience'],['experience_year']]
         drop = ['experience','experience_year']
         rename = {'id': 'experience_id'}
         df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
 
-        table_name = "location"
-        merge = [['city','region'],['city','region']]
-        drop = ['city','region']
-        rename = {'id': 'location_id'}
+        table_name = "education"
+        merge = [['education'],['education']]
+        drop = ['education']
+        rename = {'id': 'education_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        
+        table_name = "category"
+        merge = [['category'],['category']]
+        drop = ['category']
+        rename = {'id': 'category_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        table_name = "major"
+        merge = [['major'],['major']]
+        drop = ['major']
+        rename = {'id': 'major_id'}
+        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        table_name = "language"
+        merge = [['language'],['language']]
+        drop = ['language']
+        rename = {'id': 'language_id'}
         df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
         
         return df_new
@@ -93,11 +116,6 @@ class DataWarehouse(metaclass=SingletonMeta):
 
     def update_all_dimension(self, df_new):
         # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
-        table_name = "experience"
-        selected_columns = ["experience"]
-        rename = {"experience":"experience_year"}
-        id_name = ["experience_year"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
         
         table_name = "company"
         selected_columns = ['company_id', 'company', 'company_link']
@@ -117,6 +135,34 @@ class DataWarehouse(metaclass=SingletonMeta):
         id_name = ['city', 'region']
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
 
+        table_name = "experience"
+        selected_columns = ["experience"]
+        rename = {"experience":"experience_year"}
+        id_name = ["experience_year"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        table_name = "education"
+        selected_columns = ["education"]
+        rename = {}
+        id_name = ["education"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        table_name = "category"
+        selected_columns = ["category"]
+        rename = {}
+        id_name = ["category"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        table_name = "major"
+        selected_columns = ["major"]
+        rename = {}
+        id_name = ["major"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        table_name = "language"
+        selected_columns = ["language"]
+        rename = {}
+        id_name = ["language"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
 
     def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
          # 讀取目標表的資料,寫入dimention table
