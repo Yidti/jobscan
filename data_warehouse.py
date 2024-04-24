@@ -29,7 +29,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         self.port = 3306
 
     def initial_db(self):
-        # self.deleteDB(self.db_name)
+        self.deleteDB(self.db_name)
         self.createDB(self.db_name)
         self.read_sql_file()
         db_name = self.db_name

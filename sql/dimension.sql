@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS business_trip(
 -- working_hours = 時段 (eg: 日班) - 由於中文要判斷重複的部分 在此會出現錯誤 忽略unique
 CREATE TABLE IF NOT EXISTS working_hours(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    working_hours VARCHAR(255) NOT NULL
+    working_hours VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+    UNIQUE (working_hours)
 );
 
