@@ -32,7 +32,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         sql_fact = self.sql_script['fact.sql']
         self.execute_sql(db_name,sql_dimension)
         time.sleep(0.5)  # 等待 5 秒，確保 dimension 表建立完成
-        self.execute_sql(db_name,sql_fact)
+        self.execute_sql(db_name, sql_fact)
     
     def connect(self):
         # 对密码进行 URL 编码
@@ -61,59 +61,92 @@ class DataWarehouse(metaclass=SingletonMeta):
         df_new = self.replace_all_foreign_key(df_new)
         # 選擇要存入的 columns
         selected =['job_id','update_date','position','position_link',
-                   'company_id','industry_id','location_id','address',
-                   'experience_id','education_id', 'content','category_id',
-                  'major_id','language_id', 'tool']
+                   'company_id','industry_id','location_id','experience_id',
+                   'education_id', 'content', 'tool']
         df_new = df_new.loc[:, selected]
+        print(f"columns:{len(df_new.columns)}")
         # 儲存至sql (排除重複的id)
         self.insert_sql(df_new, "job_info", "job_id")
 
-
+    def replace_existing_table(self, table_name, table_name_reference, merge, drop):
+        df_existing = self.read_sql(table_name)
+        df_existing.set_index('id', inplace=True)
+        df_existing_ref = self.read_sql(table_name_reference)
+        df_existing = df_existing.merge(df_existing_ref, left_on=merge[0], right_on=merge[1], how='left')
+        df_existing.drop(columns = drop, inplace=True)
+        return df_existing
+        
     def replace_all_foreign_key(self, df_new):
         # 將 data 部分欄位取代成 dimension 的外鍵 foreign key
         table_name = "location"
-        merge = [['city','region'],['city','region']]
-        drop = ['city','region']
+        table_name_reference = "location_city_region"
+        merge = [['city_region_id'],['id']]
+        drop = ['city_region_id']
+        df_existing = self.replace_existing_table(table_name, table_name_reference, merge, drop)
+        
+        merge = [['city','region','address'],['city','region','address']]
+        drop = ['city','region','address']
         rename = {'id': 'location_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
 
-        table_name = "experience"
+        df_existing = self.read_sql("experience")
         merge = [['experience'],['experience_year']]
         drop = ['experience','experience_year']
         rename = {'id': 'experience_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
 
-        table_name = "education"
+        df_existing = self.read_sql("education")
         merge = [['education'],['education']]
         drop = ['education']
         rename = {'id': 'education_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
         
-        table_name = "category"
-        merge = [['category'],['category']]
-        drop = ['category']
-        rename = {'id': 'category_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
-        table_name = "major"
-        merge = [['major'],['major']]
-        drop = ['major']
-        rename = {'id': 'major_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
-        table_name = "language"
-        merge = [['language'],['language']]
-        drop = ['language']
-        rename = {'id': 'language_id'}
-        df_new = self.replace_foreign_key(df_new,table_name, merge, drop, rename)
+        # df_existing = self.read_sql("category")
+        # merge = [['category'],['category']]
+        # drop = ['category']
+        # rename = {'id': 'category_id'}
+        # df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
+        
+        # df_existing = self.read_sql("major")
+        # merge = [['major'],['major']]
+        # drop = ['major']
+        # rename = {'id': 'major_id'}
+        # df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
+        
+        # df_existing = self.read_sql("language")
+        # merge = [['language'],['language']]
+        # drop = ['language']
+        # rename = {'id': 'language_id'}
+        # df_new = self.replace_foreign_key(df_new, df_existing, merge, drop, rename)
         
         return df_new
     
-    def replace_foreign_key(self, df_new,table_name, merge, drop, rename):
-        existing = self.read_sql(table_name)
+    def replace_foreign_key(self, df_new, existing, merge, drop, rename):
         df_new = df_new.merge(existing, left_on=merge[0], right_on=merge[1], how='left')
         df_new.drop(columns = drop, inplace=True)
         df_new = df_new.rename(columns=rename)
         return df_new
 
+    def explode_list_sql(self, df_new, table_name, selected_column, rename, id_name):
+        df_category_item = df_new[selected_column].str.split(',')
+        df_category_item = df_category_item.explode(selected_column).reset_index(drop=True)
+        df_category_item = pd.DataFrame({selected_column: df_category_item})
+        df_category_item = df_category_item.drop_duplicates().reset_index(drop=True)
+        df_category_item = df_category_item.rename(columns = rename)
+        self.insert_sql(df_category_item, table_name, id_name)  
+
+    def split_list_sql(self, df_new, table_name, selected_column, column_name , id_name):
+        df_selected = df_new[selected_column]
+        df_list = []
+        for index, row in df_selected.items():
+            row_list = row.split(',')
+            for item in row_list:
+                # print(index, position)
+                df_list.append({'job_id': index, column_name: item})
+        df = pd.DataFrame(df_list)
+        self.insert_sql(df, table_name, id_name)
+
+    
     def update_all_dimension(self, df_new):
         # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
         
@@ -129,11 +162,24 @@ class DataWarehouse(metaclass=SingletonMeta):
         id_name = ["industry_id","industry_name"]
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
     
-        table_name = "location"
+        table_name = "location_city_region"
         selected_columns = ['city', 'region']
         rename = {}
         id_name = ['city', 'region']
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        # location table (refer: location_city_region)
+        table_name = "location"
+        dimension_table_name = "location_city_region"
+        merge = [['city','region'],['city','region']]
+        drop = ['city','region']
+        selected_columns = ['city', 'region', 'address']
+        rename = {'id': 'city_region_id'}
+        id_name = ['city_region_id', 'address']
+        df = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
+        df_existing = self.read_sql(dimension_table_name)
+        df = self.replace_foreign_key(df, df_existing, merge, drop, rename)
+        self.insert_sql(df, table_name, id_name)
 
         table_name = "experience"
         selected_columns = ["experience"]
@@ -146,31 +192,56 @@ class DataWarehouse(metaclass=SingletonMeta):
         rename = {}
         id_name = ["education"]
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        
+        # category_item (explode from category column)
+        table_name = "category_item"
+        selected_column = "category"
+        rename = {"category":"category_item"}
+        id_name = ["category_item"]
+        self.explode_list_sql(df_new, table_name, selected_column, rename, id_name)  
+
+        # category table (refer: category_item)
         table_name = "category"
-        selected_columns = ["category"]
-        rename = {}
-        id_name = ["category"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        selected_column = "category"
+        column_name = "category_item"
+        id_name = ["job_id", "category_item"]
+        self.split_list_sql(df_new, table_name, selected_column, column_name , id_name)
 
+        # major_item (explode from major column)
+        table_name = "major_item"
+        selected_column = "major"
+        rename = {"major":"major_item"}
+        id_name = ["major_item"]
+        self.explode_list_sql(df_new, table_name, selected_column, rename, id_name) 
+        
+        # major table (refer: category_item)
         table_name = "major"
-        selected_columns = ["major"]
-        rename = {}
-        id_name = ["major"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        selected_column = "major"
+        column_name = "major_item"
+        id_name = ["job_id", "major_item"]
+        self.split_list_sql(df_new, table_name, selected_column, column_name , id_name)
+        
+        # language_item (explode from language)
+        table_name = "language_item"
+        selected_column = "language"
+        rename = {"language":"language_item"}
+        id_name = ["language_item"]
+        self.explode_list_sql(df_new, table_name, selected_column, rename, id_name) 
 
+        # language table (refer: language_item)
         table_name = "language"
-        selected_columns = ["language"]
-        rename = {}
-        id_name = ["language"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+        selected_column = "language"
+        column_name = "language_item"
+        id_name = ["job_id", "language_item"]
+        self.split_list_sql(df_new, table_name, selected_column, column_name , id_name)
 
     def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
          # 讀取目標表的資料,寫入dimention table
-        df_dimension = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
+        df_new = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
         # 欄位重新命名
-        df_dimension = df_dimension.rename(columns = rename)
+        df_new = df_new.rename(columns = rename)
         # 儲存至sql (排除重複的id)
-        self.insert_sql(df_dimension, table_name, id_name)    
+        self.insert_sql(df_new, table_name, id_name)    
 
     def insert_sql(self, selected_columns, table_name, id_name):
          # 讀取目標表的資料

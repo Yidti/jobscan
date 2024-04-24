@@ -14,9 +14,12 @@
     -- industry_id = 產業_id
     -- industry_name = 產業
 
--- 7. location_id = 位置 (dimention table: location)  
-    -- city = 縣市
-    -- region = 區域
+-- 7. location_id = 位置 (dimention table: location_city_region)  
+    -- city_region_id = 區域
+    -- address = 地址
+    -- table: location_city_region
+        -- city = 縣市
+        -- region = 區域
 
 -- 8. address = 地址
 
@@ -28,14 +31,17 @@
 
 -- 11. content = 內容
 
--- 12. category_id = 類別 (dimension table: category)
-    -- category = 類別
+-- List: category = 類別 list (dimension table: category)
+    -- job_id
+    -- category_item = 類別
 
--- 13. major_id = 科系 (dimension table: major) 
-    -- major = 科系
+-- List: major = 科系 list (dimension table: major) 
+    -- job_id
+    -- major_item = 科系
 
--- 14. language_id = 語文 (dimension table: language) 
-    -- language = 語文
+-- List: language = 語文 (dimension table: language) 
+    -- job_id
+    -- language_item = 語文
 
 -- 15. tool = 工具
 -- 16. skill = 技能
@@ -62,21 +68,19 @@ CREATE TABLE IF NOT EXISTS job_info (
     company_id BIGINT NOT NULL,
     industry_id BIGINT NOT NULL,
     location_id INT NOT NULL,
-    address VARCHAR(255),
     experience_id INT NOT NULL,
     education_id INT NOT NULL,
     content TEXT,
-    category_id INT NOT NULL,
-    major_id INT NOT NULL,
-    language_id INT NOT NULL,
     tool VARCHAR(1000),
-    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id, category_id, major_id, language_id),
+    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id),
     FOREIGN KEY (company_id) REFERENCES company(company_id),
     FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
     FOREIGN KEY (location_id) REFERENCES location(id),
     FOREIGN KEY (experience_id) REFERENCES experience(id),
-    FOREIGN KEY (education_id) REFERENCES education(id),
-    FOREIGN KEY (category_id) REFERENCES category(id),
-    FOREIGN KEY (major_id) REFERENCES major(id),
-    FOREIGN KEY (language_id) REFERENCES language(id)
+    FOREIGN KEY (education_id) REFERENCES education(id)
 );
+
+-- category list 需要去 category去抓資料
+-- major list 需要去 major去抓資料
+-- language list 需要去 language去抓資料
+

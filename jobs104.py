@@ -234,7 +234,7 @@ async def fetch(job_item, driver, progress_bar):
         df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
         df_job_item.index.name = 'id'
         export_parquet(df_job_item)
-        print(f"exclude {job_item[0]}")
+        # print(f"exclude {job_item[0]}")
 
     except Exception as e:
         print(f"Error: {e}")
