@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS location(
 -- experience = 經歷 (eg: 1年, 2年)
 CREATE TABLE IF NOT EXISTS experience(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    experience_year VARCHAR(10) NOT NULL,
-    UNIQUE (experience_year)
+    experience VARCHAR(10) NOT NULL,
+    UNIQUE (experience)
 );
 
 -- education = 教育 (eg: 學士, 碩士)
@@ -102,3 +102,68 @@ CREATE TABLE IF NOT EXISTS language(
     language_item VARCHAR(255) NOT NULL,
     FOREIGN KEY (language_item) REFERENCES language_item(language_item)
 );
+
+-- tool_item = 工具 (item, eg: C#....)
+CREATE TABLE IF NOT EXISTS tool_item(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    tool_item VARCHAR(255) NOT NULL,
+    UNIQUE (tool_item)
+);
+
+-- tool = 工具 (list, eg: C#, Python.....)
+CREATE TABLE IF NOT EXISTS tool(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    job_id INT NOT NULL,
+    tool_item VARCHAR(255) NOT NULL,
+    FOREIGN KEY (tool_item) REFERENCES tool_item(tool_item)
+);
+
+-- skill_item = 技能 (item, eg: 系統架構規劃....)
+CREATE TABLE IF NOT EXISTS skill_item(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    skill_item VARCHAR(255) NOT NULL,
+    UNIQUE (skill_item)
+);
+
+-- skill = 技能 (list, eg: 系統架構規劃, 軟體程式設計.....)
+CREATE TABLE IF NOT EXISTS skill(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    job_id INT NOT NULL,
+    skill_item VARCHAR(255) NOT NULL,
+    FOREIGN KEY (skill_item) REFERENCES skill_item(skill_item)
+);
+
+-- benefits = 待遇 (eg: 待遇面議)
+CREATE TABLE IF NOT EXISTS benefits(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    benefits VARCHAR(255) NOT NULL,
+    UNIQUE (benefits)
+);
+
+-- type = 性質 (eg: 全職)
+CREATE TABLE IF NOT EXISTS type(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    type VARCHAR(255) NOT NULL,
+    UNIQUE (type)
+);
+
+-- management = 性質 (eg: 全職)
+CREATE TABLE IF NOT EXISTS management(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    management VARCHAR(255) NOT NULL,
+    UNIQUE (management)
+);
+
+-- business_trip = 出差 (eg: 無需出差外派)
+CREATE TABLE IF NOT EXISTS business_trip(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    business_trip VARCHAR(255) NOT NULL,
+    UNIQUE (business_trip)
+);
+
+-- working_hours = 時段 (eg: 日班) - 由於中文要判斷重複的部分 在此會出現錯誤 忽略unique
+CREATE TABLE IF NOT EXISTS working_hours(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    working_hours VARCHAR(255) NOT NULL
+);
+

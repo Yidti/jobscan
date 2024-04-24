@@ -43,14 +43,34 @@
     -- job_id
     -- language_item = 語文
 
--- 15. tool = 工具
--- 16. skill = 技能
--- 17. other = 其他
--- 18. benefits = 待遇
--- 19. type = 性質
--- 21. management = 管理
--- 22.business_trip = 出差
--- 23. working_hours = 時段
+-- List: tool = 工具 (dimension table: tool)
+    -- job_id
+    -- tool_item = 工具
+
+-- List. skill = 技能 (dimension table: tool)
+    -- job_id
+    -- skill_item = 技能
+
+-- 12. other = 其他
+
+-- 13. benefits_id = 待遇 (dimension table: benefits)
+    -- benefits = 待遇
+
+-- 14. type_id = 性質 (dimension table: type)
+    -- type = 性質
+
+-- 15. management_id = 管理 (dimension table: management)
+    -- management = 管理
+
+-- 16.business_trip = 出差 (dimension table: business_trip)
+    -- business_trip = 出差
+
+-- 17. working_hours = 時段 (dimension table: working_hours)
+    -- working_hours = 時段
+
+
+
+
 -- 24. vacation = 休假
 -- 25. available = 可上
 -- 26. quantity = 人數
@@ -70,17 +90,29 @@ CREATE TABLE IF NOT EXISTS job_info (
     location_id INT NOT NULL,
     experience_id INT NOT NULL,
     education_id INT NOT NULL,
-    content TEXT,
-    tool VARCHAR(1000),
-    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id),
+    content TEXT NOT NULL,
+    other TEXT NOT NULL,
+    benefits_id INT NOT NULL,
+    type_id INT NOT NULL,
+    management_id INT NOT NULL,
+    business_trip_id INT NOT NULL,
+    working_hours_id INT NOT NULL,
+    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id, benefits_id, type_id, management_id, business_trip_id, working_hours_id),
     FOREIGN KEY (company_id) REFERENCES company(company_id),
     FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
     FOREIGN KEY (location_id) REFERENCES location(id),
     FOREIGN KEY (experience_id) REFERENCES experience(id),
-    FOREIGN KEY (education_id) REFERENCES education(id)
+    FOREIGN KEY (education_id) REFERENCES education(id),
+    FOREIGN KEY (benefits_id) REFERENCES benefits(id),
+    FOREIGN KEY (type_id) REFERENCES type(id),
+    FOREIGN KEY (management_id) REFERENCES management(id),
+    FOREIGN KEY (business_trip_id) REFERENCES business_trip(id),
+    FOREIGN KEY (working_hours_id) REFERENCES working_hours(id)
 );
 
 -- category list 需要去 category去抓資料
 -- major list 需要去 major去抓資料
 -- language list 需要去 language去抓資料
+-- tool list 需要去 tool去抓資料
+-- skill list 需要去 skill去抓資料
 
