@@ -29,7 +29,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         self.port = 3306
 
     def initial_db(self):
-        self.deleteDB(self.db_name)
+        # self.deleteDB(self.db_name)
         self.createDB(self.db_name)
         self.read_sql_file()
         db_name = self.db_name
@@ -68,10 +68,10 @@ class DataWarehouse(metaclass=SingletonMeta):
         selected =['job_id','update_date','position','position_link',
                    'company_id','industry_id','location_id','experience_id',
                    'education_id', 'content','other', 'benefits_id',
-                  'type_id', 'management_id','business_trip_id','working_hours_id'
-                  ]
+                  'type_id', 'management_id','business_trip_id','working_hours_id',
+                   'vacation_id', 'available_id', 'quantity_id', 'welfare']
         df_new = df_new.loc[:, selected]
-        print(f"columns:{len(df_new.columns)}")
+        # print(f"columns:{len(df_new.columns)}")
         # 儲存至sql (排除重複的id)
         self.insert_sql(df_new, "job_info", "job_id")
 
@@ -103,6 +103,9 @@ class DataWarehouse(metaclass=SingletonMeta):
         df_new = self.one_foreign_key(df_new, "management")
         df_new = self.one_foreign_key(df_new, "business_trip")
         df_new = self.one_foreign_key(df_new, "working_hours")
+        df_new = self.one_foreign_key(df_new, "vacation")
+        df_new = self.one_foreign_key(df_new, "available")
+        df_new = self.one_foreign_key(df_new, "quantity")
 
         
         return df_new
@@ -177,7 +180,6 @@ class DataWarehouse(metaclass=SingletonMeta):
         
         self.one_column_sql(df_new, "experience")
         self.one_column_sql(df_new, "education")
-
         
         self.item_list_sql(df_new, "category_item","category")
         self.item_list_sql(df_new, "major_item","major")
@@ -190,6 +192,9 @@ class DataWarehouse(metaclass=SingletonMeta):
         self.one_column_sql(df_new, "management")
         self.one_column_sql(df_new, "business_trip")
         self.one_column_sql(df_new, "working_hours")
+        self.one_column_sql(df_new, "vacation")
+        self.one_column_sql(df_new, "available")
+        self.one_column_sql(df_new, "quantity")
 
         
     def one_column_sql(self, df_new, column_name):
@@ -235,9 +240,9 @@ class DataWarehouse(metaclass=SingletonMeta):
         # 如果有不重複的值，將其寫入目標表
         if not df_insert.empty:
             df_insert.to_sql(name=table_name, con=self.engine, if_exists='append', index=False)
-            print(f"不重複的值已成功寫入{table_name}目標表, 寫入{len(df_insert)}筆")
+            print(f"更新表格:{table_name},寫入{len(df_insert)}筆")
         else:
-            print(f"所有要寫入的值都已存在於{table_name}目標表中，無需進行寫入")
+            print(f"無須更新:{table_name}")
             
     def read_sql(self, table_name):
         existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)

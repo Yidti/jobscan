@@ -161,10 +161,31 @@ CREATE TABLE IF NOT EXISTS business_trip(
     UNIQUE (business_trip)
 );
 
--- working_hours = 時段 (eg: 日班) - 由於中文要判斷重複的部分 在此會出現錯誤 忽略unique
+-- working_hours = 時段 (eg: 日班) - 由於中文要判斷重複的部分 在此會出現錯誤 
 CREATE TABLE IF NOT EXISTS working_hours(  
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     working_hours VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
     UNIQUE (working_hours)
+);
+
+-- vacation = 休假 (eg: 周休二日) 
+CREATE TABLE IF NOT EXISTS vacation(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    vacation VARCHAR(255) NOT NULL,
+    UNIQUE (vacation)
+);
+
+-- available = 可上班時間 (eg: 一個月內) 
+CREATE TABLE IF NOT EXISTS available(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    available VARCHAR(255) NOT NULL,
+    UNIQUE (available)
+);
+
+-- quantity = 人數 (eg: 1~2人) 
+CREATE TABLE IF NOT EXISTS quantity(  
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    quantity VARCHAR(255) NOT NULL,
+    UNIQUE (quantity)
 );
 

@@ -68,16 +68,16 @@
 -- 17. working_hours = 時段 (dimension table: working_hours)
     -- working_hours = 時段
 
+-- 18. vacation = 休假 (dimension table: vacation)
+    -- vacation = 休假
 
+-- 19. available = 可上工時間 (dimension table: available)
+    -- available = 休假
 
+-- 20. quantity = 人數 (dimension table: quantity)
+    -- quantity = 人數
 
--- 24. vacation = 休假
--- 25. available = 可上
--- 26. quantity = 人數
--- 27. welfare = 福利
-
-
--- position_link = 職缺_link
+-- 21. welfare = 福利
 
 CREATE TABLE IF NOT EXISTS job_info (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
@@ -97,7 +97,11 @@ CREATE TABLE IF NOT EXISTS job_info (
     management_id INT NOT NULL,
     business_trip_id INT NOT NULL,
     working_hours_id INT NOT NULL,
-    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id, benefits_id, type_id, management_id, business_trip_id, working_hours_id),
+    vacation_id INT NOT NULL,
+    available_id INT NOT NULL,
+    quantity_id INT NOT NULL,
+    welfare TEXT NOT NULL,
+    UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id, benefits_id, type_id, management_id, business_trip_id, working_hours_id, vacation_id, available_id, quantity_id),
     FOREIGN KEY (company_id) REFERENCES company(company_id),
     FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
     FOREIGN KEY (location_id) REFERENCES location(id),
@@ -107,7 +111,10 @@ CREATE TABLE IF NOT EXISTS job_info (
     FOREIGN KEY (type_id) REFERENCES type(id),
     FOREIGN KEY (management_id) REFERENCES management(id),
     FOREIGN KEY (business_trip_id) REFERENCES business_trip(id),
-    FOREIGN KEY (working_hours_id) REFERENCES working_hours(id)
+    FOREIGN KEY (working_hours_id) REFERENCES working_hours(id),
+    FOREIGN KEY (vacation_id) REFERENCES vacation(id),
+    FOREIGN KEY (available_id) REFERENCES available(id),
+    FOREIGN KEY (quantity_id) REFERENCES quantity(id)
 );
 
 -- category list 需要去 category去抓資料
