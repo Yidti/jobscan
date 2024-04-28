@@ -6,7 +6,7 @@ import urllib.parse
 import pandas as pd
 from data_lake import DataLake
 import time
-
+        
 class SingletonMeta(type):
     _instances = {}
     
@@ -36,7 +36,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         sql_dimension = self.sql_script['dimension.sql']
         sql_fact = self.sql_script['fact.sql']
         self.execute_sql(db_name,sql_dimension)
-        time.sleep(0.5)  # 等待 5 秒，確保 dimension 表建立完成
+        time.sleep(1)  # 等待 1 秒，確保 dimension 表建立完成
         self.execute_sql(db_name, sql_fact)
     
     def connect(self):

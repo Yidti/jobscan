@@ -14,7 +14,7 @@
     -- industry_id = 產業_id
     -- industry_name = 產業
 
--- 7. location_id = 位置 (dimention table: location_city_region)  
+-- 7. location_id = 位置 (dimention table: location)  
     -- city_region_id = 區域
     -- address = 地址
     -- table: location_city_region

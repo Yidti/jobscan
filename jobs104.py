@@ -215,8 +215,8 @@ async def fetch(job_item, driver, progress_bar):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
     try:
-        # 最多重试2次
-        for retry in range(2):
+        # 最多重试3次
+        for retry in range(3):
             try:
                 driver.get(link)
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
@@ -230,6 +230,7 @@ async def fetch(job_item, driver, progress_bar):
                 pass
                 # print(f"Error loading {link}, Error: {e}, retrying...")
         
+        # 測試失敗後加入exclude裏頭
         job_item_dic = {job_item[0]: dict(job_item[1])}
         df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
         df_job_item.index.name = 'id'
