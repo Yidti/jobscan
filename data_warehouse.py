@@ -1,7 +1,7 @@
 import mysql.connector
 import os
 from translation import translation_dict
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import urllib.parse
 import pandas as pd
 from data_lake import DataLake
@@ -59,6 +59,58 @@ class DataWarehouse(metaclass=SingletonMeta):
         # 將資料更新至 fact table
         self.update_fact_sql(df_new, "job_info")
 
+    def update_all_dimension(self, df_new):
+        # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
+
+        table_name = "company"
+        selected_columns = ['company_id', 'company', 'company_link']
+        rename = {"company":"company_name"}
+        id_name = ["company_id","company_name","company_link"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        table_name = "industry"
+        selected_columns = ['industry_id', 'industry']
+        rename = {"industry":"industry_name"}
+        id_name = ["industry_id","industry_name"]
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        table_name = "location_city_region"
+        selected_columns = ['city', 'region']
+        rename = {}
+        id_name = ['city', 'region']
+        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
+
+        # location table (refer: location_city_region)
+        table_name = "location"
+        dimension_table_name = "location_city_region"
+        merge = [['city','region'],['city','region']]
+        drop = ['city','region']
+        selected_columns = ['city', 'region', 'address']
+        rename = {'id': 'city_region_id'}
+        id_name = ['city_region_id', 'address']
+        df = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
+        df_existing = self.read_sql(dimension_table_name)
+        df = self.replace_foreign_key(df, df_existing, merge, drop, rename)
+        self.insert_sql(df, table_name, id_name)
+
+        
+        self.one_column_sql(df_new, "experience")
+        self.one_column_sql(df_new, "education")
+        
+        self.item_list_sql(df_new, "category_item","category")
+        self.item_list_sql(df_new, "major_item","major")
+        self.item_list_sql(df_new, "language_item","language")
+        self.item_list_sql(df_new, "tool_item","tool")
+        self.item_list_sql(df_new, "skill_item","skill")
+
+        self.one_column_sql(df_new, "benefits")
+        self.one_column_sql(df_new, "type")
+        self.one_column_sql(df_new, "management")
+        self.one_column_sql(df_new, "business_trip")
+        self.one_column_sql(df_new, "working_hours")
+        self.one_column_sql(df_new, "vacation")
+        self.one_column_sql(df_new, "available")
+        self.one_column_sql(df_new, "quantity")
 
     def update_fact_sql(self, df_new, table_name):
         df_new.reset_index(inplace=True)
@@ -142,60 +194,6 @@ class DataWarehouse(metaclass=SingletonMeta):
         df = pd.DataFrame(df_list)
         self.insert_sql(df, table_name, id_name)
 
-    
-    def update_all_dimension(self, df_new):
-        # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
-        
-        table_name = "company"
-        selected_columns = ['company_id', 'company', 'company_link']
-        rename = {"company":"company_name"}
-        id_name = ["company_id","company_name","company_link"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
-
-        table_name = "industry"
-        selected_columns = ['industry_id', 'industry']
-        rename = {"industry":"industry_name"}
-        id_name = ["industry_id","industry_name"]
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
-    
-        table_name = "location_city_region"
-        selected_columns = ['city', 'region']
-        rename = {}
-        id_name = ['city', 'region']
-        self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
-
-        # location table (refer: location_city_region)
-        table_name = "location"
-        dimension_table_name = "location_city_region"
-        merge = [['city','region'],['city','region']]
-        drop = ['city','region']
-        selected_columns = ['city', 'region', 'address']
-        rename = {'id': 'city_region_id'}
-        id_name = ['city_region_id', 'address']
-        df = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
-        df_existing = self.read_sql(dimension_table_name)
-        df = self.replace_foreign_key(df, df_existing, merge, drop, rename)
-        self.insert_sql(df, table_name, id_name)
-
-        
-        self.one_column_sql(df_new, "experience")
-        self.one_column_sql(df_new, "education")
-        
-        self.item_list_sql(df_new, "category_item","category")
-        self.item_list_sql(df_new, "major_item","major")
-        self.item_list_sql(df_new, "language_item","language")
-        self.item_list_sql(df_new, "tool_item","tool")
-        self.item_list_sql(df_new, "skill_item","skill")
-
-        self.one_column_sql(df_new, "benefits")
-        self.one_column_sql(df_new, "type")
-        self.one_column_sql(df_new, "management")
-        self.one_column_sql(df_new, "business_trip")
-        self.one_column_sql(df_new, "working_hours")
-        self.one_column_sql(df_new, "vacation")
-        self.one_column_sql(df_new, "available")
-        self.one_column_sql(df_new, "quantity")
-
         
     def one_column_sql(self, df_new, column_name):
         table_name = column_name
@@ -227,13 +225,43 @@ class DataWarehouse(metaclass=SingletonMeta):
         # 儲存至sql (排除重複的id)
         self.insert_sql(df_new, table_name, id_name)    
 
+    # 需要修正 2025.05.04
     def insert_sql(self, selected_columns, table_name, id_name):
+        # engine = self.connect()
+        # existing_data = self.read_sql(table_name)
+        # existing_data = existing_data[id_name]
+        # # 檢查要寫入的資料是否已存在於目標表中 (依照id_name list來篩選)
+        # df_merge = pd.merge(selected_columns, existing_data, on=id_name, how='left', indicator=True)
+        # df_insert = df_merge[df_merge['_merge'] == 'left_only']
+        # df_insert = df_insert.drop('_merge', axis=1)
+    
+        # df_insert_update = pd.merge(existing_data[id_name[0]], df_insert, on=id_name[0], how='inner')
+        # if not df_insert_update.empty:
+        #     with engine.connect() as connection:
+        #         for index, row in df_insert_update.iterrows():
+        #             for index, id in enumerate(id_name):
+        #                 if index != 0:
+        #                     # 更新除了id之外的內容
+        #                     sql_query = text(f"UPDATE {table_name} SET {id} = :{id} WHERE {id_name[0]} = :{id_name[0]}")
+        #                     connection.execute(sql_query, {id: row[id], id_name[0]: row[id_name[0]]})
+        #         connection.commit()
+        #         print(f"更新表格:{table_name},寫入{len(df_insert_update)}筆")
+    
+        # # 剩下的剩下id沒有重複的內容就 append
+        # df_insert_append = pd.concat([df_insert, df_insert_update]).drop_duplicates(keep=False)
+        # if not df_insert_append.empty:
+        #     df_insert_append.to_sql(name=table_name, con=engine, if_exists='append', index=False)
+        #     print(f"新增表格:{table_name},寫入{len(df_insert_append)}筆")
+        # else:
+        #     print(f"無須新增表格:{table_name}")
+        
+        
          # 讀取目標表的資料
         existing_data = self.read_sql(table_name)
         existing_data = existing_data[id_name]
 
         # 檢查要寫入的資料是否已存在於目標表中
-        df_merge = pd.merge(selected_columns,existing_data, on=id_name, how="left", indicator=True)
+        df_merge = pd.merge(selected_columns, existing_data, on=id_name, how="left", indicator=True)
         df_insert = df_merge[df_merge['_merge'] == 'left_only']
         df_insert = df_insert.drop('_merge', axis=1)
 

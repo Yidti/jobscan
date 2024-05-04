@@ -102,19 +102,19 @@ CREATE TABLE IF NOT EXISTS job_info (
     quantity_id INT NOT NULL,
     welfare TEXT NOT NULL,
     UNIQUE (job_id, company_id, industry_id, location_id, experience_id, education_id, benefits_id, type_id, management_id, business_trip_id, working_hours_id, vacation_id, available_id, quantity_id),
-    FOREIGN KEY (company_id) REFERENCES company(company_id),
-    FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
-    FOREIGN KEY (location_id) REFERENCES location(id),
-    FOREIGN KEY (experience_id) REFERENCES experience(id),
-    FOREIGN KEY (education_id) REFERENCES education(id),
-    FOREIGN KEY (benefits_id) REFERENCES benefits(id),
-    FOREIGN KEY (type_id) REFERENCES type(id),
-    FOREIGN KEY (management_id) REFERENCES management(id),
-    FOREIGN KEY (business_trip_id) REFERENCES business_trip(id),
-    FOREIGN KEY (working_hours_id) REFERENCES working_hours(id),
-    FOREIGN KEY (vacation_id) REFERENCES vacation(id),
-    FOREIGN KEY (available_id) REFERENCES available(id),
-    FOREIGN KEY (quantity_id) REFERENCES quantity(id)
+    CONSTRAINT fk_company FOREIGN KEY (company_id) REFERENCES company(company_id),
+    CONSTRAINT fk_industry FOREIGN KEY (industry_id) REFERENCES industry(industry_id),
+    CONSTRAINT fk_location FOREIGN KEY (location_id) REFERENCES location(id),
+    CONSTRAINT fk_experience FOREIGN KEY (experience_id) REFERENCES experience(id),
+    CONSTRAINT fk_education FOREIGN KEY (education_id) REFERENCES education(id),
+    CONSTRAINT fk_benefits FOREIGN KEY (benefits_id) REFERENCES benefits(id),
+    CONSTRAINT fk_type FOREIGN KEY (type_id) REFERENCES type(id),
+    CONSTRAINT fk_management FOREIGN KEY (management_id) REFERENCES management(id),
+    CONSTRAINT fk_business_trip FOREIGN KEY (business_trip_id) REFERENCES business_trip(id),
+    CONSTRAINT fk_working_hours FOREIGN KEY (working_hours_id) REFERENCES working_hours(id),
+    CONSTRAINT fk_vacation FOREIGN KEY (vacation_id) REFERENCES vacation(id),
+    CONSTRAINT fk_available FOREIGN KEY (available_id) REFERENCES available(id),
+    CONSTRAINT fk_quantity FOREIGN KEY (quantity_id) REFERENCES quantity(id)
 );
 
 -- category list 需要去 category去抓資料

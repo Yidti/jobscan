@@ -2,6 +2,7 @@
 import crawler104, config.search_params, async_example, threaded_async_job, jobs104
 import data_lake, data_warehouse, translation, data_analysis
 
+
 import importlib
 importlib.reload(crawler104)
 importlib.reload(async_example)
@@ -20,3 +21,4 @@ from data_lake import DataLake
 from data_warehouse import DataWarehouse
 from data_analysis import DataAnalysis
 from translation import translation_dict
+import matplotlib.pyplot as plt
