@@ -69,60 +69,7 @@ class DataAnalysis(metaclass=SingletonMeta):
             df = pd.DataFrame()  # 雖然不是必需,但保留這行也沒有問題
         return df
 
-    def horizontal_countplot(self, df : pd.DataFrame, column_name : str, ax = None):
-        # if df.empty:
-        #     print("DataFrame 為空，無法繪製計數柱狀圖。")
-        # return  # 如果 DataFrame 為空，直接返回，不繼續執行後續的程式碼
-        
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-        if ax is None:
-            ax = plt.gca()
-        
-        order = df[column_name].value_counts().index
-        # 新增：從 Seaborn 的 "husl" 調色板獲取顏色列表
-        colors = sns.color_palette("husl", len(order)) 
-        # 修改：將顏色列表傳遞給 palette 參數
-        ax = sns.countplot(data=df, y=column_name, order=order, ax=ax, palette=colors, hue=column_name, legend=False)
-        # ax = sns.countplot(data=df, y=column_name, order=order, ax=ax)
-        for p in ax.patches:
-            w = int(p.get_width())
-            ax.annotate(f'{w}', (w, p.get_y() + p.get_height() / 2.),
-                        ha='left', va='center',fontsize=10, color='black', xytext=(2, 0),
-                        textcoords='offset points')
-    
-        max_count = df[column_name].value_counts().max()
-        max_x = ((max_count + 100) // 100 + 1) * 100
-        ax.set_xlim(0, max_x) 
-        plt.xlabel('Counts')
-        plt.ylabel('')
-        plt.tight_layout()
-        plt.show()
-
-    def vertical_countplot(self, df, column_name, ax=None):
-        if df.empty:
-            print("DataFrame 為空，無法繪製計數柱狀圖。")
-        return  # 如果 DataFrame 為空，直接返回，不繼續執行後續的程式碼
-        
-
-        # if ax is None:
-        #     ax = plt.gca()  # 如果未提供 ax，則使用當前的 Axes
-        # 新增：從 Seaborn 的 "husl" 調色板獲取顏色列表
-        colors = sns.color_palette("husl", len(df[column_name].value_counts()))  
-        # 修改：將顏色列表傳遞給 palette 參數
-        sns.countplot(data=df, x=column_name, ax=ax, palette=colors, hue=column_name, legend=False)
-    
-        # sns.countplot(data=df, x=column_name, ax=ax)
-        for p in ax.patches:
-            h = int(p.get_height())
-            ax.annotate(f'{h}', (p.get_x() + p.get_width() / 2., h),
-                        ha='center', va='center', fontsize=12, color='black', xytext=(0, 5),
-                        textcoords='offset points')
-        ax.set_ylabel('Counts')
-        plt.tight_layout()
-        plt.show()
-
-
-    def plot_countplot(self, df, column_name, ax=None, figsize=(10, 6)):
+    def plot_countplot(self, df, column_name, ax=None, figsize=(10, 6), vertical=True, rotation=0):
 
         if df.empty:
             print("DataFrame 为空,无法绘制计数柱状图。")
@@ -139,27 +86,47 @@ class DataAnalysis(metaclass=SingletonMeta):
         value_counts = df[column_name].value_counts()
         order = value_counts.index
         colors = sns.color_palette("husl", len(order))
-    
-        ax = sns.countplot(data=df, x=column_name, order=order, palette=colors, ax=ax, hue=column_name, legend=False)
-    
-        for p in ax.patches:
-            count = int(p.get_height())
-            ax.annotate(f'{count}', (p.get_x() + p.get_width() / 2., p.get_height()),
-                        ha='center', va='bottom', fontsize=10, color='black', xytext=(0, 5),
-                        textcoords='offset points')
-    
-        ax.set_xlabel(column_name)
-        ax.set_ylabel('Counts')
-        # 调整坐标轴限制以确保数字不超出外框
-        ax.set_ylim(top=ax.get_ylim()[1] * 1.05)
 
+
+        if vertical == True:
+            ax = sns.countplot(data=df, x=column_name, order=order, palette=colors, ax=ax, hue=column_name, legend=False)
+            for p in ax.patches:
+                count = int(p.get_height())
+                ax.annotate(f'{count}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                            ha='center', va='bottom', fontsize=10, color='black', xytext=(0, 5),
+                            textcoords='offset points')
+            ax.set_xlabel(column_name)
+            ax.set_ylabel('Counts')
+            ax.set_ylim(top=ax.get_ylim()[1] * 1.02)
+            
+            for tick in ax.get_xticklabels():
+                tick.set_rotation(rotation)
+
+        else:
+            ax = sns.countplot(data=df, y=column_name, order=order, ax=ax, palette=colors, hue=column_name, legend=False)
+            for p in ax.patches:
+                w = int(p.get_width())
+                ax.annotate(f'{w}', (w, p.get_y() + p.get_height() / 2.),
+                            ha='left', va='center',fontsize=10, color='black', xytext=(5, 0),
+                            textcoords='offset points')
+            ax.set_xlabel('Counts')
+            ax.set_ylabel(column_name)
+            ax.set_xlim(right=ax.get_xlim()[1] * 1.02)
+            
+            for tick in ax.get_yticklabels():
+                tick.set_rotation(rotation)
+        
         x_limit_1 = ax.get_xlim()[0]
         x_limit_2 = ax.get_xlim()[1]
-        diff = x_limit_2*0.04
+        diff = x_limit_2*0.02
         ax.set_xlim(left= x_limit_1 - diff)
         ax.set_xlim(right= x_limit_2 + diff)
-        plt.xticks(rotation=45)
+
+        y_limit_1 = ax.get_ylim()[0]
+        y_limit_2 = ax.get_ylim()[1]
+        diff = y_limit_2*0.02
+        ax.set_ylim(top= y_limit_2 + diff)
+        ax.set_ylim(bottom= y_limit_1 - diff)
+
+        
         plt.tight_layout()
-
-
-
