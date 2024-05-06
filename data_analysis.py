@@ -9,9 +9,26 @@ import matplotlib as mpl
 import sqlite3
 import pymongo
 from wordcloud import WordCloud
-# 設定中文字型為微軟正黑體
-mpl.rcParams['font.family'] = 'Microsoft JhengHei'
+import platform
 
+def set_font():
+    """
+    設定matplotlib的字體,根據作業系統自動選擇合適的字體
+    """
+    os_name = platform.system()
+    
+    if os_name == 'Windows':
+        # 對於Windows系統
+        mpl.rcParams['font.family'] = 'Microsoft JhengHei'
+    elif os_name == 'Darwin':
+        # 對於Mac OS系統
+        mpl.rcParams['font.family'] = 'Arial Unicode MS'
+    else:
+        # 對於Linux或其他系統
+        mpl.rcParams['font.family'] = 'DejaVu Sans'
+        
+# 使用該函數設定字體
+set_font()
 
 
 class SingletonMeta(type):
