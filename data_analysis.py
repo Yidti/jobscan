@@ -229,7 +229,7 @@ class DataAnalysis(metaclass=SingletonMeta):
     
         plt.tight_layout()
     
-    def plot_pie(self, df, column_name, ax=None, figsize=(10, 6), startangle=45, x_move=1.4, y_move=1.2, y_add=0.2, threshold=0):
+    def plot_pie(self, df, column_name, ax=None, figsize=(10, 6), startangle=45, x_move=1.4, y_move=1.2, y_add=0.2, threshold=0, diff_ang=8):
         if df.empty:
             print("DataFrame 為空,無法繪製圖形。")
             return
@@ -277,7 +277,7 @@ class DataAnalysis(metaclass=SingletonMeta):
             if too_close:
             # 如果太靠近,調整新的 annotate 位置
                 # print("Change")
-                ang = prev_ang + 8
+                ang = prev_ang + diff_ang
                 yy = np.sin(np.deg2rad(ang))
                 xx = np.cos(np.deg2rad(ang))
                 horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(xx))]
@@ -303,6 +303,98 @@ class DataAnalysis(metaclass=SingletonMeta):
         ax.set_frame_on(False)
         plt.tight_layout()
 
-        
 
+    def tool_count(self, df):
+        # 將 NaN 值填充為空字符串
+        df['tool'].fillna("", inplace=True)
+        
+        # 定義常見軟體業tool
+        tool = {
+            'Python': 0, 'C++': 0, 'Java': 0, 'JavaScript': 0, 'R':0,
+            'C#': 0, 'C': 0, 'PHP': 0, 'Go': 0, '.NET': 0, 'HTML': 0,
+            'SQL': 0, 'Swift': 0, 'MATLAB': 0, 'Ruby': 0, 'CSS': 0, 'Node.js': 0,
+            'Linux': 0, 'Git': 0, 'Github': 0, 'Jquery':0, 'Vue': 0,
+        }
+        
+        for k in tool.keys():
+            if k == 'C++':
+                tool[k] = df['tool'].str.contains('C\+\+', case=False).sum()
+            elif k == 'R':
+                tool[k] = df['tool'].apply(lambda x:bool(re.findall(r'R(?![A-Za-z])', x))).sum()
+            elif k == 'C':
+                tool[k] = df['tool'].apply(lambda x:bool(re.findall(r'C(?![A-Za-z+#])', x))).sum()
+            else:
+                tool[k] = df['tool'].str.contains(k, case=False).sum()
+        
+        # 將計數字典轉換為 DataFrame
+        df_tool = pd.DataFrame.from_dict({'tool': list(tool.keys()), 'count': list(tool.values())})
+        
+        # 移除 count 欄位小於五的行
+        df_tool = df_tool[df_tool['count'] >= 5]
+        
+        # 根據 Count 欄位排序
+        df_tool.sort_values(by='count', ascending=True, inplace=True)
+        
+        # plot
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        df_tool.plot(kind='barh', x='tool', y='count', legend=None, ax=ax1)
+        for i, v in enumerate(df_tool['count']):
+            ax1.text(v, i, str(v), fontsize=9)
+        ax1.set_xlabel('counts')
+        
+        spine_alpha = 0.1
+        for spine in ax1.spines.values():
+            spine.set_alpha(spine_alpha)
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
     
+        # word cloud
+        wordcloud = WordCloud(width=400, height=400, background_color='white').generate_from_frequencies(tool)
+        ax2.imshow(wordcloud, interpolation='bilinear')
+        ax2.axis('off')
+    
+        plt.tight_layout()
+        plt.show()
+
+        df_tool_sorted = df_tool.sort_values(by='count', ascending=False)
+
+        return df_tool_sorted
+
+    def plot_bar(self, df, x, y, orient='vertical'):
+        """
+        Plot a bar chart based on the DataFrame `df`.
+        
+        Parameters:
+            df (DataFrame): The DataFrame containing the data to be plotted.
+            x (str): The column name to be used for the x-axis.
+            y (str): The column name to be used for the y-axis.
+            orient (str): The orientation of the bar chart. Can be 'vertical' (default) or 'horizontal'.
+        """
+        sns.set(style="whitegrid")  # 設置風格
+        if orient == 'vertical':
+            ax = sns.barplot(data=df, x=x, y=y, order=df[x].values)
+            plt.xticks(rotation=45, ha='right')
+            for p in ax.patches:
+                count = int(p.get_height())
+                ax.annotate(f'{count}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                                ha='center', va='bottom', fontsize=10, color='black', xytext=(0, 5),
+                                textcoords='offset points')
+        
+        elif orient == 'horizontal':
+            ax = sns.barplot(data=df, x=y, y=x, order=df[x].values, orient='h')
+            for p in ax.patches:
+                w = int(p.get_width())
+                ax.annotate(f'{w}', (w, p.get_y() + p.get_height() / 2.),
+                                ha='left', va='center', fontsize=10, color='black', xytext=(5, 0),
+                                textcoords='offset points')
+        else:
+            raise ValueError("Invalid orientation. Use 'vertical' or 'horizontal'.")
+    
+        spine_alpha = 0.1
+        for spine in ax.spines.values():
+            spine.set_alpha(spine_alpha)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        plt.tight_layout()  # 調整子圖間距
+        plt.show()  # 顯示圖形
