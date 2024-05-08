@@ -49,6 +49,24 @@ class DataLake():
                 
         print(f'Update {update_count} records, Insert {new_count} records in {self.collection_name} collection')
 
+    
+
+    def load_all(self):
+        client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = client[self.noSQL_DB_name]
+        collection = db[self.collection_name]
+        
+        data_list = list(collection.find({}, {"_id": 0}))  # 返回整個集合的所有文檔，排除 _id 欄位
+        
+        if data_list:
+            df_jobs = pd.DataFrame(data_list)
+            df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
+        else:
+            print("No data found in the collection.")
+            df_jobs = pd.DataFrame()  # 返回一個空的 DataFrame
+    
+        return df_jobs
+
     def load_latest(self):
         client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = client[self.noSQL_DB_name]

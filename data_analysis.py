@@ -54,6 +54,12 @@ class DataAnalysis(metaclass=SingletonMeta):
             engine = create_engine(f'mysql+mysqlconnector://root:{password}@localhost:3306/{db_name}')
             return engine
 
+    def read_sql(self, table_name):
+        existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)
+        return existing_data
+
+
+    
     def load_sql_table(self, table_name):
         existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)
         return existing_data
@@ -87,8 +93,78 @@ class DataAnalysis(metaclass=SingletonMeta):
             df = pd.DataFrame()  # 雖然不是必需,但保留這行也沒有問題
         return df
 
-    def plot_count(self, df, column_name, ax=None, figsize=(10, 6), vertical=True, rotation=0):
+    # def plot_count(self, df, column_name, ax=None, figsize=(10, 6), vertical=True, rotation=0, threshold=0):
 
+    #     if df.empty:
+    #         print("DataFrame 为空,无法绘制计数柱状图。")
+    #         return
+    
+    #     if column_name not in df.columns:
+    #         print(f"列名 '{column_name}' 不存在于 DataFrame 中。")
+    #         return
+    
+    #     if ax is None:
+    #         fig, ax = plt.subplots(figsize=figsize)  # 创建一个新的图形和坐标轴对象
+    
+    #     # total_count = df[column_name].count()
+    #     value_counts = df[column_name].value_counts(dropna=False)
+    #     sizes = value_counts.values
+    #     total_count = sizes.sum()  # 總計數
+    #     print(value_counts)
+    #     percentages = []
+
+    #     for size in sizes:
+    #         percentage = size / total_count * 100
+    #         percentages.append(percentage)
+    #     order = value_counts.index
+    #     colors = sns.color_palette("husl", len(order))
+
+    #     if vertical == True:
+    #         ax = sns.countplot(data=df, x=column_name, order=order, palette=colors, ax=ax, hue=column_name, legend=False)
+    #         for i, (p, percentage) in enumerate(zip(ax.patches,percentages)):
+    #             count = int(p.get_height())
+    #             if percentage > threshold:
+    #                 ax.annotate(f'{count}', (p.get_x() + p.get_width() / 2., p.get_height()),
+    #                         ha='center', va='bottom', fontsize=10, color='black', xytext=(0, 5),
+    #                         textcoords='offset points')
+    #         ax.set_xlabel(column_name)
+    #         ax.set_ylabel('Counts')
+    #         ax.set_ylim(top=ax.get_ylim()[1] * 1.02)
+            
+    #         for tick in ax.get_xticklabels():
+    #             tick.set_rotation(rotation)
+
+    #     else:
+    #         ax = sns.countplot(data=df, y=column_name, order=order, ax=ax, palette=colors, hue=column_name, legend=False)
+    #         for p in ax.patches:
+    #             w = int(p.get_width())
+    #             ax.annotate(f'{w}', (w, p.get_y() + p.get_height() / 2.),
+    #                         ha='left', va='center',fontsize=10, color='black', xytext=(5, 0),
+    #                         textcoords='offset points')
+    #         ax.set_xlabel('Counts')
+    #         ax.set_ylabel(column_name)
+    #         ax.set_xlim(right=ax.get_xlim()[1] * 1.02)
+            
+    #         for tick in ax.get_yticklabels():
+    #             tick.set_rotation(rotation)
+        
+    #     x_limit_1 = ax.get_xlim()[0]
+    #     x_limit_2 = ax.get_xlim()[1]
+    #     diff = x_limit_2*0.02
+    #     ax.set_xlim(left= x_limit_1 - diff)
+    #     ax.set_xlim(right= x_limit_2 + diff)
+
+    #     y_limit_1 = ax.get_ylim()[0]
+    #     y_limit_2 = ax.get_ylim()[1]
+    #     diff = y_limit_2*0.02
+    #     ax.set_ylim(top= y_limit_2 + diff)
+    #     ax.set_ylim(bottom= y_limit_1 - diff)
+
+    #     plt.tight_layout()
+
+
+
+    def plot_count(self, df, column_name, ax=None, figsize=(10, 6), vertical=True, rotation=0, threshold=1, x_diff = 0.02, y_diff=0.02):
         if df.empty:
             print("DataFrame 为空,无法绘制计数柱状图。")
             return
@@ -100,15 +176,23 @@ class DataAnalysis(metaclass=SingletonMeta):
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)  # 创建一个新的图形和坐标轴对象
     
-        total_count = df[column_name].count()
-        value_counts = df[column_name].value_counts()
-        order = value_counts.index
-        colors = sns.color_palette("husl", len(order))
-
-
-        if vertical == True:
-            ax = sns.countplot(data=df, x=column_name, order=order, palette=colors, ax=ax, hue=column_name, legend=False)
-            for p in ax.patches:
+        value_counts = df[column_name].value_counts(dropna=False)
+        sizes = value_counts.values
+        total_count = sizes.sum()  # 总计数
+    
+        percentages = []
+        filtered_order = []  # 过滤后的顺序
+        for size, value in zip(sizes, value_counts.index):
+            percentage = (size / total_count) * 100
+            if percentage >= threshold:
+                percentages.append(percentage)
+                filtered_order.append(value)
+    
+        colors = sns.color_palette("husl", len(sizes))
+    
+        if vertical:
+            ax = sns.countplot(data=df, x=column_name, order=filtered_order, palette=colors, ax=ax, hue=column_name, legend=False)
+            for i, (p, percentage) in enumerate(zip(ax.patches, percentages)):
                 count = int(p.get_height())
                 ax.annotate(f'{count}', (p.get_x() + p.get_width() / 2., p.get_height()),
                             ha='center', va='bottom', fontsize=10, color='black', xytext=(0, 5),
@@ -116,40 +200,36 @@ class DataAnalysis(metaclass=SingletonMeta):
             ax.set_xlabel(column_name)
             ax.set_ylabel('Counts')
             ax.set_ylim(top=ax.get_ylim()[1] * 1.02)
-            
             for tick in ax.get_xticklabels():
                 tick.set_rotation(rotation)
-
         else:
-            ax = sns.countplot(data=df, y=column_name, order=order, ax=ax, palette=colors, hue=column_name, legend=False)
-            for p in ax.patches:
+            ax = sns.countplot(data=df, y=column_name, order=filtered_order, ax=ax, palette=colors, hue=column_name, legend=False)
+            for i, (p, percentage) in enumerate(zip(ax.patches, percentages)):
                 w = int(p.get_width())
                 ax.annotate(f'{w}', (w, p.get_y() + p.get_height() / 2.),
-                            ha='left', va='center',fontsize=10, color='black', xytext=(5, 0),
+                            ha='left', va='center', fontsize=10, color='black', xytext=(5, 0),
                             textcoords='offset points')
             ax.set_xlabel('Counts')
             ax.set_ylabel(column_name)
             ax.set_xlim(right=ax.get_xlim()[1] * 1.02)
-            
             for tick in ax.get_yticklabels():
                 tick.set_rotation(rotation)
-        
+    
         x_limit_1 = ax.get_xlim()[0]
         x_limit_2 = ax.get_xlim()[1]
-        diff = x_limit_2*0.02
-        ax.set_xlim(left= x_limit_1 - diff)
-        ax.set_xlim(right= x_limit_2 + diff)
-
+        diff = x_limit_2 * x_diff
+        ax.set_xlim(left=x_limit_1 - diff)
+        ax.set_xlim(right=x_limit_2 + diff)
+    
         y_limit_1 = ax.get_ylim()[0]
         y_limit_2 = ax.get_ylim()[1]
-        diff = y_limit_2*0.02
-        ax.set_ylim(top= y_limit_2 + diff)
-        ax.set_ylim(bottom= y_limit_1 - diff)
-
-        plt.tight_layout()
-
+        diff = y_limit_2 * y_diff
+        ax.set_ylim(top=y_limit_2 + diff)
+        ax.set_ylim(bottom=y_limit_1 - diff)
     
-    def plot_pie(self, df, column_name, ax=None, figsize=(10, 6), startangle=45, x_move=1.4, y_move=1.2, y_add=0.2):
+        plt.tight_layout()
+    
+    def plot_pie(self, df, column_name, ax=None, figsize=(10, 6), startangle=45, x_move=1.4, y_move=1.2, y_add=0.2, threshold=0):
         if df.empty:
             print("DataFrame 為空,無法繪製圖形。")
             return
@@ -167,11 +247,12 @@ class DataAnalysis(metaclass=SingletonMeta):
         colors = sns.color_palette("husl", len(labels))
         total = sum(sizes)  # 計算總數
         results = []
+        percentages = []
         for label, size in zip(labels, sizes):
             percentage = (size / total) * 100  # 計算百分比
+            percentages.append(percentage)
             result = f"{label} ({percentage:.2f}%)"
             results.append(result)
-
         wedges, texts = ax.pie(sizes, wedgeprops=dict(width=0.5), startangle=startangle)
         bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
         kw = dict(arrowprops=dict(arrowstyle="-"), bbox=bbox_props, zorder=0, va="center")
@@ -208,68 +289,10 @@ class DataAnalysis(metaclass=SingletonMeta):
                 xytext = (x_move*np.sign(x), y_move*y)
             
             prev_ang = ang_origin
-
-            ax.annotate(results[i], xy=(x, y), xytext=xytext,
-                        horizontalalignment=horizontalalignment, **kw)
-
-
-        # for i, p in enumerate(wedges):
-        #     ang_origin = (p.theta2 - p.theta1)/2. + p.theta1
-        #     y = np.sin(np.deg2rad(ang_origin))
-        #     x = np.cos(np.deg2rad(ang_origin))
-        #     print("ang",ang_origin, x, y)
-        #     horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
-        
-        #     connectionstyle = f"angle,angleA=0,angleB={ang_origin}"
-        #     kw["arrowprops"].update({"connectionstyle": connectionstyle})
-        
-        #     # 檢查新的 annotate 位置是否太靠近之前的 annotate 位置
-        #     too_close = False
             
-        #     # distance = np.sqrt((x - prev_x)**2 + (y - prev_y)**2)
-        #     diff_ang = np.abs(prev_ang-ang_origin)
-        #     print("diff_ang",diff_ang)
-        #     if diff_ang < min_ang:
-        #         too_close = True
-
-            
-        #     if too_close:
-        #         # 如果太靠近,調整新的 annotate 位置
-        #         print("Change")
-        #         ang = prev_ang + 8
-        #         prev_ang = ang
-
-        #         # y = np.sin(np.deg2rad(ang))
-        #         # x = np.cos(np.deg2rad(ang))
-        #         horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
-        #         connectionstyle = f"angle,angleA=0,angleB={ang}"
-        #         kw["arrowprops"].update({"connectionstyle": connectionstyle})
-                
-        #         text_x = 1.3*np.sign(x)
-        #         text_y = 1.4*y
-        #         # text_x, text_y = x * 1.3, y * 1.2
-
-        #         print('Change',f'{results[i]}',ang)
-
-        #     else:
-        #         prev_ang = ang_origin
-        #         # text_x, text_y = x * 1.3, y * 1.2
-
-        #         text_x = 1.3*np.sign(x)
-        #         text_y =1.2*y
-
-            
-            
-        #     if i in range(0,8):
-        #         # print(results[i], x, y, text_x, text_y)
-        #         ann = ax.annotate(results[i], xy=(x, y), xytext=(text_x, text_y),
-        #                           horizontalalignment=horizontalalignment, **kw)
-        #         # 記錄新的 annotate 位置
-        #         prev_x= ann.xy[0]
-        #         prev_y= ann.xy[1]
-
-            
-
+            if percentages[i] > threshold:
+                ax.annotate(results[i], xy=(x, y), xytext=xytext,
+                            horizontalalignment=horizontalalignment, **kw)
 
         
         

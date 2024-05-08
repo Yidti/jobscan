@@ -50,8 +50,9 @@ class DataWarehouse(metaclass=SingletonMeta):
 
     # 先從NoSQL抓資料dataframe
     def save_sql(self, data_lake:DataLake):
-        self.df_no_sql = data_lake.load_latest()
-        
+        # self.df_no_sql = data_lake.load_latest()
+        self.df_no_sql = data_lake.load_all()
+
         # 將最新資料列名重命名為與目標表相匹配的名稱
         df_new = self.df_no_sql.rename(columns=translation_dict)
         # 將資料更新至 dimension table
@@ -212,7 +213,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         table_name = list_name
         selected_column = list_name
         column_name = item_name
-        id_name = ["job_id", item_name]
+        id_name = ["job_id", f"{item_name}"]
         self.split_list_sql(df_new, table_name, selected_column, column_name , id_name)
                       
     def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
@@ -227,34 +228,6 @@ class DataWarehouse(metaclass=SingletonMeta):
 
     # 需要修正 2025.05.04
     def insert_sql(self, selected_columns, table_name, id_name):
-        # engine = self.connect()
-        # existing_data = self.read_sql(table_name)
-        # existing_data = existing_data[id_name]
-        # # 檢查要寫入的資料是否已存在於目標表中 (依照id_name list來篩選)
-        # df_merge = pd.merge(selected_columns, existing_data, on=id_name, how='left', indicator=True)
-        # df_insert = df_merge[df_merge['_merge'] == 'left_only']
-        # df_insert = df_insert.drop('_merge', axis=1)
-    
-        # df_insert_update = pd.merge(existing_data[id_name[0]], df_insert, on=id_name[0], how='inner')
-        # if not df_insert_update.empty:
-        #     with engine.connect() as connection:
-        #         for index, row in df_insert_update.iterrows():
-        #             for index, id in enumerate(id_name):
-        #                 if index != 0:
-        #                     # 更新除了id之外的內容
-        #                     sql_query = text(f"UPDATE {table_name} SET {id} = :{id} WHERE {id_name[0]} = :{id_name[0]}")
-        #                     connection.execute(sql_query, {id: row[id], id_name[0]: row[id_name[0]]})
-        #         connection.commit()
-        #         print(f"更新表格:{table_name},寫入{len(df_insert_update)}筆")
-    
-        # # 剩下的剩下id沒有重複的內容就 append
-        # df_insert_append = pd.concat([df_insert, df_insert_update]).drop_duplicates(keep=False)
-        # if not df_insert_append.empty:
-        #     df_insert_append.to_sql(name=table_name, con=engine, if_exists='append', index=False)
-        #     print(f"新增表格:{table_name},寫入{len(df_insert_append)}筆")
-        # else:
-        #     print(f"無須新增表格:{table_name}")
-        
         
          # 讀取目標表的資料
         existing_data = self.read_sql(table_name)
