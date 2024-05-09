@@ -22,3 +22,4 @@ from data_warehouse import DataWarehouse
 from data_analysis import DataAnalysis
 from translation import translation_dict
 import matplotlib.pyplot as plt
+
