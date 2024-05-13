@@ -1,3 +1,5 @@
+# 此個 Dockerfile 用於架設網站用API顯示爬蟲結果
+
 FROM python:3.10.13-slim
 
 # 更新 pip
