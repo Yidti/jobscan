@@ -1,0 +1,1 @@
+[2024-05-14T06:55:24.840+0000] {task_context_logger.py:104} ERROR - Executor reports task instance <TaskInstance: data_pipeline_jobs104.data_crawler_list manual__2024-05-14T06:55:22.897666+00:00 [queued]> finished (failed) although the task says it's queued. (Info: None) Was the task killed externally?

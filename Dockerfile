@@ -1,24 +1,10 @@
-# 此個 Dockerfile 用於架設網站用API顯示爬蟲結果
+# 安裝套件
 
-FROM python:3.10.13-slim
+FROM apache/airflow:2.9.1
 
-# 更新 pip
-RUN pip install --no-cache-dir --upgrade pip
+# 安装所需的 Python 包
+ADD requirements.txt .
 
-# 安裝編譯所需的工具和庫
-RUN apt-get update && apt-get install -y \
-    default-libmysqlclient-dev \
-    build-essential \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install -r requirements.txt
 
-WORKDIR /app
-
-COPY requirements.txt /app/
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . /app/
-
-CMD ["python", "app.py"]
-    
+# ENV CHROME_DRIVER_PATH=/usr/bin/chromedriver

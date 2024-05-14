@@ -1,0 +1,41 @@
+[2024-05-14T08:00:32.468+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2024-05-14T08:00:32.531+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: data_pipeline_jobs104.data_crawler_list manual__2024-05-14T08:00:29.963887+00:00 [queued]>
+[2024-05-14T08:00:32.537+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: data_pipeline_jobs104.data_crawler_list manual__2024-05-14T08:00:29.963887+00:00 [queued]>
+[2024-05-14T08:00:32.538+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 1
+[2024-05-14T08:00:32.546+0000] {taskinstance.py:2330} INFO - Executing <Task(PythonOperator): data_crawler_list> on 2024-05-14 08:00:29.963887+00:00
+[2024-05-14T08:00:32.552+0000] {warnings.py:110} WARNING - /home/***/.local/lib/python3.12/site-packages/***/task/task_runner/standard_task_runner.py:61: DeprecationWarning: This process (pid=56) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  pid = os.fork()
+
+[2024-05-14T08:00:32.554+0000] {standard_task_runner.py:63} INFO - Started process 58 to run task
+[2024-05-14T08:00:32.554+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'data_pipeline_jobs104', 'data_crawler_list', 'manual__2024-05-14T08:00:29.963887+00:00', '--job-id', '60', '--raw', '--subdir', 'DAGS_FOLDER/data_pipeline_jobs104.py', '--cfg-path', '/tmp/tmpsk5pqptq']
+[2024-05-14T08:00:32.556+0000] {standard_task_runner.py:91} INFO - Job 60: Subtask data_crawler_list
+[2024-05-14T08:00:32.585+0000] {task_command.py:426} INFO - Running <TaskInstance: data_pipeline_jobs104.data_crawler_list manual__2024-05-14T08:00:29.963887+00:00 [running]> on host ceeaa83f1981
+[2024-05-14T08:00:32.634+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='***' AIRFLOW_CTX_DAG_ID='data_pipeline_jobs104' AIRFLOW_CTX_TASK_ID='data_crawler_list' AIRFLOW_CTX_EXECUTION_DATE='2024-05-14T08:00:29.963887+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2024-05-14T08:00:29.963887+00:00'
+[2024-05-14T08:00:32.635+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2024-05-14T08:00:32.651+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2024-05-14T08:00:32.651+0000] {taskinstance.py:2905} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.12/site-packages/airflow/models/taskinstance.py", line 465, in _execute_task
+    result = _execute_callable(context=context, **execute_callable_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/airflow/.local/lib/python3.12/site-packages/airflow/models/taskinstance.py", line 432, in _execute_callable
+    return execute_callable(context=context, **execute_callable_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/airflow/.local/lib/python3.12/site-packages/airflow/models/baseoperator.py", line 400, in wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/airflow/.local/lib/python3.12/site-packages/airflow/operators/python.py", line 235, in execute
+    return_value = self.execute_callable()
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/airflow/.local/lib/python3.12/site-packages/airflow/operators/python.py", line 252, in execute_callable
+    return self.python_callable(*self.op_args, **self.op_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/airflow/dags/data_pipeline_jobs104.py", line 36, in data_crawler_list
+    filter_params = get_filter_params(role, keyword, isnew, jobexp, mode, order, asc)
+                    ^^^^^^^^^^^^^^^^^
+NameError: name 'get_filter_params' is not defined
+[2024-05-14T08:00:32.658+0000] {taskinstance.py:1206} INFO - Marking task as FAILED. dag_id=data_pipeline_jobs104, task_id=data_crawler_list, run_id=manual__2024-05-14T08:00:29.963887+00:00, execution_date=20240514T080029, start_date=20240514T080032, end_date=20240514T080032
+[2024-05-14T08:00:32.664+0000] {standard_task_runner.py:110} ERROR - Failed to execute job 60 for task data_crawler_list (name 'get_filter_params' is not defined; 58)
+[2024-05-14T08:00:32.697+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 1
+[2024-05-14T08:00:32.713+0000] {taskinstance.py:3498} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2024-05-14T08:00:32.716+0000] {local_task_job_runner.py:222} INFO - ::endgroup::

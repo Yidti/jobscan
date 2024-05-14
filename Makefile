@@ -1,6 +1,10 @@
 #!/usr/bin/make -f
-IMAGE := python-slim
-VERSION := 3.10.13
+#IMAGE := python-slim
+#VERSION := 3.10.13
+
+IMAGE := apache/airflow
+VERSION := 2.9.1
+
 
 .PHONY: all build rebuild shell run
 
