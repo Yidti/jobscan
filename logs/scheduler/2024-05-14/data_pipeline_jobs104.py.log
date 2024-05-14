@@ -7902,3 +7902,17 @@ DETAIL:  Key (dag_id)=(data_pipeline_jobs104) already exists.
 [2024-05-14T14:32:52.501+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:32:52.500+0000] {dag.py:3096} INFO - Sync 1 DAGs
 [2024-05-14T14:32:52.505+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:32:52.505+0000] {dag.py:3954} INFO - Setting next_dagrun for data_pipeline_jobs104 to None, run_after=None
 [2024-05-14T14:32:52.514+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/data_pipeline_jobs104.py took 0.461 seconds
+[2024-05-14T14:33:22.850+0000] {processor.py:161} INFO - Started process (PID=484) to work on /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:22.853+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/data_pipeline_jobs104.py for tasks to queue
+[2024-05-14T14:33:22.856+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:22.856+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:23.243+0000] {processor.py:840} INFO - DAG(s) 'data_pipeline_jobs104' retrieved from /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:23.255+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:23.254+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2024-05-14T14:33:23.261+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:23.260+0000] {dag.py:3954} INFO - Setting next_dagrun for data_pipeline_jobs104 to None, run_after=None
+[2024-05-14T14:33:23.269+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/data_pipeline_jobs104.py took 0.431 seconds
+[2024-05-14T14:33:53.614+0000] {processor.py:161} INFO - Started process (PID=494) to work on /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:53.617+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/data_pipeline_jobs104.py for tasks to queue
+[2024-05-14T14:33:53.620+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:53.619+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:53.985+0000] {processor.py:840} INFO - DAG(s) 'data_pipeline_jobs104' retrieved from /opt/airflow/dags/data_pipeline_jobs104.py
+[2024-05-14T14:33:54.033+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:54.033+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2024-05-14T14:33:54.038+0000] {logging_mixin.py:188} INFO - [2024-05-14T14:33:54.038+0000] {dag.py:3954} INFO - Setting next_dagrun for data_pipeline_jobs104 to None, run_after=None
+[2024-05-14T14:33:54.045+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/data_pipeline_jobs104.py took 0.439 seconds

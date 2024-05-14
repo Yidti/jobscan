@@ -141,3 +141,4 @@ ui-tests/.pnp.*
 logs/scheduler/2024-05-14/data_pipeline_jobs104.py.log
 /logs
 *.jupyterlab-workspace
+*.log
