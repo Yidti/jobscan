@@ -19,8 +19,8 @@ from config.search_params import get_filter_params
 from crawler104 import Crawler104
 
 
-# first step
-def data_crawler_list():
+
+def initail_filter():
     # custom filter params for search - for yidti
     role = {'ro':'全職'}
     keyword = {'keyword':"後端工程師 python"}
@@ -36,6 +36,12 @@ def data_crawler_list():
     # user
     user = "yidti"
     crawler = Crawler104(filter_params, user)
+    return crawler
+
+
+# first step
+def data_crawler_list():
+    crawler = initail_filter()
     
     # keywords for filter job again
     job_keywords = ('工程','資料','python','data','數據','後端')
@@ -62,8 +68,10 @@ def data_crawler_list():
     crawler.run(job_keywords, company_exclude)
 
 
-
-
+# second step
+def data_crawler_detail():
+    crawler = initail_filter()
+    
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',

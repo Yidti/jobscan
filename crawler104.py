@@ -43,12 +43,12 @@ class Crawler104():
     }
     url = 'https://www.104.com.tw/jobs/search/?'
     
-    def __init__(self, filter_params, user="", page = 15):
+    def __init__(self, filter_params, user="",title="" , page = 15):
         self.filter_params = filter_params
         self.user = user
+        self.title = title
         self.page = page
-        # self.df_company = pd.DataFrame()
-        # self.df_industry = pd.DataFrame()
+        
         self.df_jobs = pd.DataFrame()
         self.df_jobs_details = pd.DataFrame()
         self.remote = True
@@ -137,6 +137,8 @@ class Crawler104():
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
                 total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
                 # 讀取所有頁面
+                # test mode
+                total_page=15
                 self.load_pages(driver, total_page, scroll_times=15)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 # 讀取所有 job item
@@ -299,6 +301,26 @@ class Crawler104():
         
         print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
+        # 儲存在暫存檔案裡頭 (加入日期標記）
+        current_date = datetime.now().date()
+        self.df_jobs['data stamp'] = current_date.strftime('%Y-%m-%d')
+        
+        parquet_file = f"{self.user}-{self.title}.parquet" 
+        parquet_path = f"temp/{parquet_file}"
+        
+        if os.path.exists(parquet_path):
+            existing_df = pd.read_parquet(parquet_path)
+            combined_df = pd.concat([existing_df, self.df_jobs], join='inner')
+            combined_df = combined_df.reset_index(drop=False)
+            combined_df = combined_df.drop_duplicates(subset='id')
+            combined_df = combined_df.set_index('id')
+        else:
+        # 如果文件不存在，则仅使用新的 DataFrame
+            combined_df = self.df_jobs
+
+        # 寫入 Parquet 文件
+        combined_df.to_parquet(parquet_path, index=True)
+    
         # # transfer to df and save in object
         # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
         # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
@@ -309,8 +331,6 @@ class Crawler104():
         # self.df_jobs.index.name = 'id'
 
         # return filtered_jobs
-
-    
 
     
     def detail(self):
@@ -356,6 +376,11 @@ class Crawler104():
             print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
 
+    # 2024.05.15 jobs list
+    def export_jobs_list(self):
+        pass
+
+    
     def export_parquet(self):
         # add Parquet file
         current_date = datetime.now().date()    

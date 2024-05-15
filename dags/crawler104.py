@@ -137,6 +137,8 @@ class Crawler104():
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
                 total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
                 # 讀取所有頁面
+                # Test model
+                total_page = 10
                 self.load_pages(driver, total_page, scroll_times=15)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 # 讀取所有 job item
