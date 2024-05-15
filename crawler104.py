@@ -51,20 +51,51 @@ class Crawler104():
         # self.df_industry = pd.DataFrame()
         self.df_jobs = pd.DataFrame()
         self.df_jobs_details = pd.DataFrame()
+        self.remote = True
+        # 假如是本機連線至遠端使用localhost
+        self.remote_url = 'http://localhost:4444/wd/hub'
+        # change container name! 假如是container內互相連線則改成chrome
+        # self.remote_url = 'http://chrome:4444/wd/hub'
         
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
         return url
 
-    def configure_driver(self):
+    def configure_driver(self, use_remote=False):
         option = Options()
         option.add_argument(f"user-agent={self.headers['User-Agent']}")
         option.add_experimental_option('excludeSwitches', ['enable-automation'])
         option.add_argument('--headless')
         # option.add_argument("--disable-gpu")
-        return webdriver.Chrome(options=option)
 
+        if use_remote:
+            # Use webdriver.Remote to connect to the Selenium Grid
+            print("use remote chrome")
+            return webdriver.Remote(
+                command_executor=self.remote_url,
+                options=option
+            )
+        else:
+            # Use local webdriver.Chrome
+            print("use local chrome")
+            return webdriver.Chrome(options=option)
+
+    def check_driver(self):
+        try:
+            # 嘗試初始化 driver
+            driver = self.configure_driver(use_remote= self.remote)
+            driver.quit()
+            print("Chrome driver is available.")
+            return True
+        except Exception as e:
+            print(f"Error initializing Chrome driver: {e}")
+            # 重新拋出異常，以便 Airflow 檢測到任務失敗
+            raise
+            # return False
+
+
+    
     def load_pages(self, driver, total_page, scroll_times):
         current_page = 0
 
@@ -100,7 +131,7 @@ class Crawler104():
             try:
                 # 嘗試執行原本的搜尋邏輯
                 url = self.fetch_url()
-                driver = self.configure_driver()
+                driver = self.configure_driver(use_remote= self.remote)
                 driver.get(url)
 
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
@@ -255,6 +286,10 @@ class Crawler104():
         return filtered_job
 
     def run(self, job_keywords=(), company_exclude=()):
+        if not self.check_driver():
+            print("Driver check failed. Exiting.")
+            raise ValueError("Driver check failed.")
+            
         start_time = time.time()
         # result_items = self.search_job()
         self.search_job()

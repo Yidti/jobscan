@@ -1,5 +1,5 @@
 # dags/data_pipeline_jobs104.py
-from datetime import datetime
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -62,10 +62,22 @@ def data_crawler_list():
     crawler.run(job_keywords, company_exclude)
 
 
+
+
+
 with DAG(
     dag_id = 'data_pipeline_jobs104',
     start_date = datetime(2024, 5, 1),
-    schedule_interval=None
+    schedule_interval=None,
+    default_args={
+        'depends_on_past': False,
+        'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
+        'email_on_failure': True, #如果Task執行失敗的話，是否寄信
+        'email_on_retry': False, #如果Task重試的話，是否寄信
+        'retries': 1, #最多重試的次數
+        'retry_delay': timedelta(minutes=2), #每次重試中間的間隔
+    },
+    
 ) as dag:
     # task_hello = PythonOperator(
     # task_id='say_hello',

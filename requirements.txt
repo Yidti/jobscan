@@ -1,4 +1,4 @@
 tqdm
 selenium
 xlsxwriter
-webdriver-manager
+webdriver_manager

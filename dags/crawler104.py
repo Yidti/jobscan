@@ -30,10 +30,6 @@ import asyncio
 # 通常用於處理一些特定的情況，例如在Jupyter Notebook中執行異步代碼。
 # nest_asyncio.apply()
 
-from config.search_params import get_filter_params
-
-
-
 def get_values(selected, mapping):
     codes = [mapping[item] for item in selected]
     values = ','.join(map(str, codes))
@@ -55,22 +51,51 @@ class Crawler104():
         # self.df_industry = pd.DataFrame()
         self.df_jobs = pd.DataFrame()
         self.df_jobs_details = pd.DataFrame()
+        self.remote = True
+        # 假如是本機連線至遠端使用localhost
+        # self.remote_url = 'http://localhost:4444/wd/hub'
+        # change container name! 假如是container內互相連線則改成chrome
+        self.remote_url = 'http://chrome:4444/wd/hub'
         
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
         return url
 
-    def configure_driver(self):
+    def configure_driver(self, use_remote=False):
         option = Options()
         option.add_argument(f"user-agent={self.headers['User-Agent']}")
         option.add_experimental_option('excludeSwitches', ['enable-automation'])
         option.add_argument('--headless')
         # option.add_argument("--disable-gpu")
-        # option.add_argument("--disable-dev-shm-usage");
 
-        return webdriver.Chrome(options=option)
+        if use_remote:
+            # Use webdriver.Remote to connect to the Selenium Grid
+            print("use remote chrome")
+            return webdriver.Remote(
+                command_executor=self.remote_url,
+                options=option
+            )
+        else:
+            # Use local webdriver.Chrome
+            print("use local chrome")
+            return webdriver.Chrome(options=option)
 
+    def check_driver(self):
+        try:
+            # 嘗試初始化 driver
+            driver = self.configure_driver(use_remote= self.remote)
+            driver.quit()
+            print("Chrome driver is available.")
+            return True
+        except Exception as e:
+            print(f"Error initializing Chrome driver: {e}")
+            # 重新拋出異常，以便 Airflow 檢測到任務失敗
+            raise
+            # return False
+
+
+    
     def load_pages(self, driver, total_page, scroll_times):
         current_page = 0
 
@@ -106,7 +131,7 @@ class Crawler104():
             try:
                 # 嘗試執行原本的搜尋邏輯
                 url = self.fetch_url()
-                driver = self.configure_driver()
+                driver = self.configure_driver(use_remote= self.remote)
                 driver.get(url)
 
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
@@ -261,6 +286,10 @@ class Crawler104():
         return filtered_job
 
     def run(self, job_keywords=(), company_exclude=()):
+        if not self.check_driver():
+            print("Driver check failed. Exiting.")
+            raise ValueError("Driver check failed.")
+            
         start_time = time.time()
         # result_items = self.search_job()
         self.search_job()
@@ -398,47 +427,4 @@ class Crawler104():
         #     print(f"CSV文件保存成功: {output_filename}")
         # except PermissionError as e:
         #     print(f"无法保存文件: {e}")
-
-
-def crawler104_main():
-    print("test")
-    # custom filter params for search - for yidti
-    role = {'ro':'全職'}
-    keyword = {'keyword':"後端工程師 python"}
-    # area = {'area':['新北市', '台北市', '桃園市', '台中市']}
-    isnew = {'isnew':'三日內'}
-    jobexp = {'jobexp':['1年以下', '1-3年']}
-    # 預設
-    mode = {'mode':'列表'}  # 一次能呈現比較多筆資料
-    order = {'order':'日期排序'}
-    asc = {'asc':'遞減'}
-    # filter_params = get_filter_params(role, keyword, area, isnew, jobexp, mode, order, asc)
-    filter_params = get_filter_params(role, keyword, isnew, jobexp, mode, order, asc)
-    # # keywords for filter job again
-    # job_keywords = ('工程','資料','python','data','數據','後端')
-    # # Exclude keywords to filter out companies related to gambling or others that I don't want to consider.
-    # company_exclude = ('新加坡商冕創有限公司','新博軟體開發股份有限公司','現觀科技股份有限公司'
-    #                    ,'全富數位有限公司','杰思數位有限公司','博凡星國際有限公司',
-    #                   '尊博科技股份有限公司','新騎資訊有限公司','新加坡商鈦坦科技股份有限公司台灣分公司',
-    #                    '豪穎科技股份有限公司','塶樂微創有限公司','磐弈有限公司',
-    #                    '聯訊網路有限公司','冶金數位科技有限公司','肥貓科技有限公司',
-    #                    '無名科技有限公司','博澭科技有限公司','緯雲股份有限公司',
-    #                    '風采有限公司','英屬維京群島商嘉碼科技有限公司台灣分公司',
-    #                    '冠宇數位科技股份有限公司','英仕國際有限公司','元遊科技有限公司',
-    #                    '禾碩資訊股份有限公司','向上集團_向上國際科技股份有限公司',
-    #                    '弈樂科技股份有限公司','馬來西亞商極限電腦科技有限公司台灣分公司',
-    #                    '樂夠科技有限公司','威智國際有限公司','紅信科技有限公司',
-    #                    '深思設計有限公司','揚帆科技有限公司','晶要資訊有限公司',
-    #                    '九七科技股份有限公司','臣悅科技有限公司','尊承科技股份有限公司',
-    #                    '遊戲河流有限公司','唐傳有限公司','捷訊資訊有限公司',
-    #                    '逍遙遊科技有限公司','澄果資訊服務有限公司','果遊科技有限公司',
-    #                    '昱泉國際股份有限公司','博星數位股份有限公司',
-    #                   )
-    user = "yidti"
-    crawler = Crawler104(filter_params, user)
-    # print(f"設定排除{len(company_exclude)}家公司")
-    return crawler
-    
-if __name__ == "__main__":
-    crawler104_main()
             
