@@ -90,7 +90,7 @@ x-airflow-common:
 
 services:
   chrome:
-    image: seleniarm/standalone-chromium
+    image: seleniarm/standalone-chromium:latest
     # image: selenium/standalone-chrome
     shm_size: 2gb
     ports:

@@ -1,9 +1,10 @@
 # reload file if you eaited them
-import crawler104, config.search_params, async_example, threaded_async_job, jobs104
+import crawler, crawler104, config.search_params, async_example, threaded_async_job, jobs104
 import data_lake, data_warehouse, translation, data_analysis
 
 
 import importlib
+importlib.reload(crawler)
 importlib.reload(crawler104)
 importlib.reload(async_example)
 importlib.reload(threaded_async_job)

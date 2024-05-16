@@ -13,6 +13,8 @@ import html
 import re
 from datetime import datetime
 
+from crawler import Crawler
+
 headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
     }
@@ -176,14 +178,16 @@ def get_content(soup, job_item):
 
     return job_item
 
-async def get_info(jobs_batch, progress_bar):
+async def get_info(jobs_batch, progress_bar, crawler):
     # jobs_list = [f"https:{item['href']}" for item in jobs_list]
     # jobs_list = [url.split('?')[0] for url in jobs_list]
 
     # jobs_list = [item[1]['連結'] for item in jobs_batch]
     tasks = []
     # 在異步任務之外初始化 WebDriver 實例
-    driver = webdriver.Chrome(options=option)
+    # driver = webdriver.Chrome(options=option)
+    # crawler = Crawler(remote=False, diff_container=False)
+    driver = crawler.configure_driver()
 
     # 使用信号量控制并发
     semaphore = asyncio.Semaphore(10) 

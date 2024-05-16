@@ -11,6 +11,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+from crawler import Crawler
+
 
 import threaded_async_job
 import os
@@ -35,44 +37,6 @@ def get_values(selected, mapping):
     values = ','.join(map(str, codes))
     return values
     
-class Crawler():
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
-    }
-    def __init__(self, remote=True, diff_container=False):
-        self.remote = remote
-        # 假如remote模式才考慮是不相容器下還是相同容器下
-        self.diff_container = diff_container
-        
-        # 提示使用者
-        if self.remote:
-            print("use remote chrome setting")
-        else:
-            print("use local chrome setting")
-            
-        if self.diff_container:
-            # 不同container 互相連線則改成容器名稱: chrome
-            self.remote_url = 'http://chrome:4444/wd/hub'
-        else:
-            # 相同容器下的連線, 則使用localhost
-            self.remote_url = 'http://localhost:4444/wd/hub'
-        
-    def configure_driver(self):
-        option = Options()
-        option.add_argument(f"user-agent={self.headers['User-Agent']}")
-        option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        option.add_argument('--headless')
-        # option.add_argument("--disable-gpu")
-        
-        if self.remote:
-            # Use webdriver.Remote to connect to the Selenium Grid
-            return webdriver.Remote(
-                command_executor=self.remote_url,
-                options=option
-            )
-        else:
-            # Use local webdriver.Chrome (in the same container)
-            return webdriver.Chrome(options=option)
 
 
 class Crawler104():
@@ -91,48 +55,21 @@ class Crawler104():
         self.df_jobs = pd.DataFrame()
         self.df_jobs_temp = pd.DataFrame()
         self.df_jobs_details = pd.DataFrame()
-        self.remote = True
-        # 假如remote模式才考慮是相同容器下還是不同容器下
-        self.different_container_connect = False
-        if self.remote:
-            print("use remote chrome setting")
-            
-        else:
-            print("use local chrome setting")
-            
-        if self.different_container_connect:
-            # 不同container 互相連線則改成容器名稱: chrome
-            self.remote_url = 'http://chrome:4444/wd/hub'
-        else:
-            # 相同容器下的連線, 則使用localhost
-            self.remote_url = 'http://localhost:4444/wd/hub'
+
+        # 請依照連線狀況設定, 遠端chrome時, 有不同容器或相同容器狀況
+        self.crawler = Crawler(remote=True, diff_container=False)
+        # 目前遠端有一個大問題, detail爬蟲的時候會當機
         
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
         return url
-
-    def configure_driver(self, use_remote=False):
-        option = Options()
-        option.add_argument(f"user-agent={self.headers['User-Agent']}")
-        option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        option.add_argument('--headless')
-        # option.add_argument("--disable-gpu")
-
-        if use_remote:
-            # Use webdriver.Remote to connect to the Selenium Grid
-            return webdriver.Remote(
-                command_executor=self.remote_url,
-                options=option
-            )
-        else:
-            # Use local webdriver.Chrome (in the same container)
-            return webdriver.Chrome(options=option)
-
+    
     def check_driver(self):
         try:
             # 嘗試初始化 driver
-            driver = self.configure_driver(use_remote= self.remote)
+            driver = self.crawler.configure_driver()
+            # driver = self.configure_driver(use_remote= self.remote)
             driver.quit()
             print("Chrome driver is available.")
             return True
@@ -141,8 +78,6 @@ class Crawler104():
             # 重新拋出異常，以便 Airflow 檢測到任務失敗
             raise
             # return False
-
-
     
     def load_pages(self, driver, total_page, scroll_times):
         current_page = 0
@@ -179,14 +114,16 @@ class Crawler104():
             try:
                 # 嘗試執行原本的搜尋邏輯
                 url = self.fetch_url()
-                driver = self.configure_driver(use_remote= self.remote)
+
+                driver = self.crawler.configure_driver()
+                # driver = self.configure_driver(use_remote= self.remote)
                 driver.get(url)
 
                 element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
                 total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
                 # 讀取所有頁面
                 # test mode
-                total_page=15
+                # total_page=15
                 self.load_pages(driver, total_page, scroll_times=15)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 # 讀取所有 job item
@@ -438,7 +375,7 @@ class Crawler104():
             # df_close = self.read_parquet("exclude")
             # # 抓取detail目標
             df_scrape = self.df_jobs_temp.copy()
-            df_scrape = df_scrape.head(10)
+            # df_scrape = df_scrape.head(10)
             # if df_exist is not None:
             #     # 过滤掉存在于 df_exist 中的 id
             #     df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
@@ -448,24 +385,25 @@ class Crawler104():
             # print(f"exclude exist and close data")    
             # print(f"Remove from parquet, leaving {len(df_scrape)} remaining to scrape .")
             
-            jobs_details = threaded_async_job.scraper(df_scrape)
+            jobs_details = threaded_async_job.scraper(df_scrape, self.crawler)
             print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
             df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
             df_jobs_details.index.name = 'id'
             # print(df_jobs_details.columns)
             # print(df_jobs_details.head(1))
-            self.df_jobs_details =df_jobs_details
+            self.df_jobs_details = df_jobs_details
             # 爬虫爬取到的 jobs_details 放入 df_exist 中
             # self.df_jobs = pd.concat([df_exist, df_jobs_details])
             # self.df_jobs_details = pd.concat([df_exist, df_jobs_details])
-
+            # 儲存在暫存檔案裡頭 (加入日期標記）
+            current_date = datetime.now().date()
+            self.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
             # 重新排序column
             columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
                      "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
                      "語文", "工具", "技能", "其他", "待遇", 
                      "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利", "data_stamp" ]
             self.df_jobs_details = self.df_jobs_details[columns]
-
             # 儲存到 detail 暫存檔
             self.save_parquet(self.df_jobs_details, detail=True)
             print(f"花費 {np.round((time.time() - start_time),2)} 秒")
