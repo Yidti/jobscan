@@ -16,7 +16,7 @@ class DataLake():
         # df = self.load_excel(user)
 
         current_date = datetime.now().date()
-        crawler.df_jobs_details['data stamp'] = current_date.strftime('%Y-%m-%d')
+        crawler.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
 
         df_jobs = crawler.df_jobs_details.copy()
         # df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
