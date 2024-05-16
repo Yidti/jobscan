@@ -13,20 +13,20 @@ import html
 import re
 from datetime import datetime
 
-from crawler import Crawler
+# from crawler import Crawler
 
-headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
-    }
-option = Options()
-# option.page_load_strategy = 'none'
-option.add_argument(f"user-agent={headers['User-Agent']}")
-# option.add_experimental_option('excludeSwitches', ['enable-automation'])
-option.add_argument('--headless') # 瀏覽器不提供頁面觀看，linux下如果系統是純文字介面不加這條會啓動失敗
-# option.add_argument('--disable-dev-shm-usage') # 使用共享內存RAM
-# option.add_argument('--disable-gpu') # 規避部分chrome gpu bug
-# option.add_experimental_option("prefs", prefs)
-option.add_argument('blink-settings=imagesEnabled=false') #不加載圖片提高效率
+# headers = {
+#         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+#     }
+# option = Options()
+# # option.page_load_strategy = 'none'
+# option.add_argument(f"user-agent={headers['User-Agent']}")
+# # option.add_experimental_option('excludeSwitches', ['enable-automation'])
+# option.add_argument('--headless') # 瀏覽器不提供頁面觀看，linux下如果系統是純文字介面不加這條會啓動失敗
+# # option.add_argument('--disable-dev-shm-usage') # 使用共享內存RAM
+# # option.add_argument('--disable-gpu') # 規避部分chrome gpu bug
+# # option.add_experimental_option("prefs", prefs)
+# option.add_argument('blink-settings=imagesEnabled=false') #不加載圖片提高效率
 
 
 def extract_script_content(soup):
@@ -187,21 +187,29 @@ async def get_info(jobs_batch, progress_bar, crawler):
     # 在異步任務之外初始化 WebDriver 實例
     # driver = webdriver.Chrome(options=option)
     # crawler = Crawler(remote=False, diff_container=False)
-    driver = crawler.configure_driver()
-
-    # 使用信号量控制并发
-    semaphore = asyncio.Semaphore(10) 
+    # driver = crawler.configure_driver()
+    # with crawler.configure_driver() as driver:    
+    #     # 使用信号量控制并发
+    #     semaphore = asyncio.Semaphore(10) 
+        
+    #     # for link in jobs_list:
+    #     for job_item in jobs_batch:
+    #         async with semaphore:
+    #             task = asyncio.create_task(fetch(job_item, driver, progress_bar))
+    #             tasks.append(task)
+        
+    #     results = await asyncio.gather(*tasks)
+    with crawler.configure_driver() as driver:
+        semaphore = asyncio.Semaphore(10)
+        for job_item in jobs_batch:
+            async with semaphore:
+                task = asyncio.create_task(fetch(job_item, progress_bar, driver))
+                tasks.append(task)
+        results = await asyncio.gather(*tasks)
     
-    # for link in jobs_list:
-    for job_item in jobs_batch:
-        async with semaphore:
-            task = asyncio.create_task(fetch(job_item, driver, progress_bar))
-            tasks.append(task)
-    
-    results = await asyncio.gather(*tasks)
-    
-    # 退出浏览器
-    driver.quit()
+        
+        # 退出浏览器
+        # driver.quit()
     return results
 
  
@@ -215,33 +223,32 @@ def export_parquet(df):
         df.to_parquet(parquet_path, index=True)
 
 
-async def fetch(job_item, driver, progress_bar):
+async def fetch(job_item, progress_bar, driver):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
-    try:
-        # 最多重试3次
-        for retry in range(3):
-            try:
-                driver.get(link)
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                job_item_detail = get_content(soup, job_item)
-                progress_bar.update(1)
+    # 最多重试3次
+    for retry in range(3):
+        try:
+            # driver = crawler.configure_driver()
+            driver.get(link)
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            job_item_detail = get_content(soup, job_item)
+            progress_bar.update(1)
 
-                return job_item_detail
-            
-            except Exception as e:
-                pass
-                # print(f"Error loading {link}, Error: {e}, retrying...")
-        
-        # 測試失敗後加入exclude裏頭
-        job_item_dic = {job_item[0]: dict(job_item[1])}
-        df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
-        df_job_item.index.name = 'id'
-        export_parquet(df_job_item)
-        # print(f"exclude {job_item[0]}")
+            return job_item_detail
+        except Exception as e:
+            pass
+            # print(f"Error loading {link}, Error: {e}, retrying...")
+    
+    # 測試失敗後加入exclude裏頭
+    job_item_dic = {job_item[0]: dict(job_item[1])}
+    df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
+    df_job_item.index.name = 'id'
+    export_parquet(df_job_item)
+    # print(f"exclude {job_item[0]}")
 
-    except Exception as e:
-        print(f"Error: {e}")
+    # except Exception as e:
+    #     print(f"Error: {e}")
 
     return None

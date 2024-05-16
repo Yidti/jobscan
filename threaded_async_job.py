@@ -6,6 +6,10 @@ from datetime import datetime
 import os
 import threading
 
+from crawler import Crawler
+
+
+
 
 async def scrape_batch(jobs_batch, progress_bar, crawler):
     tasks = []
@@ -25,7 +29,7 @@ def process_batch(jobs, start_idx, end_idx, all_results, progress_bar,crawler):
     results = loop.run_until_complete(scrape_batch(current_batch, progress_bar,crawler))
     all_results.extend(results)
 
-def scraper(jobs, crawler):
+def scraper(instance , jobs):
     # 把dataframe轉成dictionary
     jobs_dict = jobs.to_dict(orient='index')
     # 把dictionary轉成list
@@ -35,7 +39,7 @@ def scraper(jobs, crawler):
     current_date = datetime.now().date()    
     
     # 每個 batch 的 size (非同步每個 batch 處理)
-    batch_size = 100
+    batch_size = 50
     # 確認 batches 數量
     num_batches = (len(jobs) + batch_size - 1) // batch_size
     all_results = []
@@ -46,7 +50,11 @@ def scraper(jobs, crawler):
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batch_size
             end_idx = min((batch_idx + 1) * batch_size, len(jobs))
-    
+
+
+            # 为每个线程创建一个新的 Crawler 实例
+            crawler = Crawler(remote=instance.remote, diff_container=instance.diff_container)
+            
             # 启动一个新线程来处理当前 batch
             thread = threading.Thread(target=process_batch, args=(jobs, start_idx, end_idx, all_results, progress_bar, crawler))
             thread.start()

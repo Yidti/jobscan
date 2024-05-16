@@ -57,7 +57,10 @@ class Crawler104():
         self.df_jobs_details = pd.DataFrame()
 
         # 請依照連線狀況設定, 遠端chrome時, 有不同容器或相同容器狀況
-        self.crawler = Crawler(remote=True, diff_container=False)
+        self.remote = True
+        self.diff_container = False
+        # 初步爬蟲使用
+        self.crawler = Crawler(remote=self.remote, diff_container=self.diff_container)
         # 目前遠端有一個大問題, detail爬蟲的時候會當機
         
     def fetch_url(self):
@@ -68,10 +71,11 @@ class Crawler104():
     def check_driver(self):
         try:
             # 嘗試初始化 driver
-            driver = self.crawler.configure_driver()
-            # driver = self.configure_driver(use_remote= self.remote)
-            driver.quit()
-            print("Chrome driver is available.")
+            with self.crawler.configure_driver() as driver:
+                # driver = 
+                # driver = self.configure_driver(use_remote= self.remote)
+                # driver.quit()
+                print("Chrome driver is available.")
             return True
         except Exception as e:
             print(f"Error initializing Chrome driver: {e}")
@@ -115,36 +119,38 @@ class Crawler104():
                 # 嘗試執行原本的搜尋邏輯
                 url = self.fetch_url()
 
-                driver = self.crawler.configure_driver()
-                # driver = self.configure_driver(use_remote= self.remote)
-                driver.get(url)
+                # driver = 
 
-                element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
-                total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
-                # 讀取所有頁面
-                # test mode
-                # total_page=15
-                self.load_pages(driver, total_page, scroll_times=15)
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                # 讀取所有 job item
-                raw_jobs = soup.find_all("article", class_="js-job-item")
-                job_items = self.get_job_items(raw_jobs)
-                # company_items,industry_items,job_items = result_items
-                print(f'載入{len(job_items)}筆資料', end=" | ")
-                driver.quit()
-
-                # result 包含 company, industry, job (dictionary)
-                # company_items, industry_items, job_items = result_items 
-                # transfer to df and save in object
-                # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
-                # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
-                self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
-        
-                # self.df_company.index.name = 'id'
-                # self.df_industry.index.name = 'id'
-                self.df_jobs.index.name = 'id'
-
-                return True
+                with self.crawler.configure_driver() as driver: 
+                    # driver = self.configure_driver(use_remote= self.remote)
+                    driver.get(url)
+    
+                    element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
+                    total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
+                    # 讀取所有頁面
+                    # test mode
+                    # total_page=15
+                    self.load_pages(driver, total_page, scroll_times=15)
+                    soup = BeautifulSoup(driver.page_source, 'html.parser')
+                    # 讀取所有 job item
+                    raw_jobs = soup.find_all("article", class_="js-job-item")
+                    job_items = self.get_job_items(raw_jobs)
+                    # company_items,industry_items,job_items = result_items
+                    print(f'載入{len(job_items)}筆資料', end=" | ")
+                    # driver.quit()
+    
+                    # result 包含 company, industry, job (dictionary)
+                    # company_items, industry_items, job_items = result_items 
+                    # transfer to df and save in object
+                    # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
+                    # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
+                    self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
+            
+                    # self.df_company.index.name = 'id'
+                    # self.df_industry.index.name = 'id'
+                    self.df_jobs.index.name = 'id'
+                    return True
+                    
             except Exception as e:
                 retry_count += 1
                 print(f'執行錯誤, retry {retry_count}, {e}')
@@ -384,8 +390,9 @@ class Crawler104():
             #     df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
             # print(f"exclude exist and close data")    
             # print(f"Remove from parquet, leaving {len(df_scrape)} remaining to scrape .")
-            
-            jobs_details = threaded_async_job.scraper(df_scrape, self.crawler)
+
+            # remove crawler
+            jobs_details = threaded_async_job.scraper(self, df_scrape)
             print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
             df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
             df_jobs_details.index.name = 'id'

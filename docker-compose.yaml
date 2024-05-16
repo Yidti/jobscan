@@ -99,6 +99,9 @@ services:
     environment:
       # - CHROME_DRIVER_PATH=/usr/bin/chromedriver
       - SE_VNC_NO_PASSWORD=1 # NO_PASSWORD
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_MAX_SESSIONS=10
+      - SE_SESSION_REQUEST_TIMEOUT=1000
     #   - SE_VNC_VIEW_ONLY=1   # readonly
   postgres:
     image: postgres:13
