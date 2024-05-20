@@ -6,7 +6,7 @@ from airflow.operators.python import PythonOperator
 # test operator !!!
 # from app import say_hello
 # build opperators !!!
-# from tasks.app import say_hello
+from app import say_hello
 # from tasks.main import data_crawler_list
 from app import check_if_update
 from app import data_crawler_detail
@@ -19,8 +19,7 @@ from config.search_params import get_filter_params
 from crawler104 import Crawler104
 
 
-
-def initail_filter():
+def get_crawler104():
     # custom filter params for search - for yidti
     role = {'ro':'全職'}
     keyword = {'keyword':"後端工程師 python"}
@@ -33,15 +32,15 @@ def initail_filter():
     asc = {'asc':'遞減'}
     # filter_params = get_filter_params(role, keyword, area, isnew, jobexp, mode, order, asc)
     filter_params = get_filter_params(role, keyword, isnew, jobexp, mode, order, asc)
-    # user
+    # user & title
     user = "yidti"
-    crawler = Crawler104(filter_params, user)
+    title = "data_Engineer"
+    crawler = Crawler104(filter_params, user, title)
     return crawler
 
-
-# first step
+# first step - 2024/05/20
 def data_crawler_list():
-    crawler = initail_filter()
+    crawler = get_crawler104()
     
     # keywords for filter job again
     job_keywords = ('工程','資料','python','data','數據','後端')
@@ -68,29 +67,29 @@ def data_crawler_list():
     crawler.run(job_keywords, company_exclude)
 
 
-# second step
-def data_crawler_detail():
-    crawler = initail_filter()
+# # second step
+# def data_crawler_detail():
+#     crawler = initail_filter()
     
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',
-    start_date = datetime(2024, 5, 1),
+    start_date = datetime(2024, 5, 19),
     schedule_interval=None,
     default_args={
         'depends_on_past': False,
-        'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
-        'email_on_failure': True, #如果Task執行失敗的話，是否寄信
-        'email_on_retry': False, #如果Task重試的話，是否寄信
+        # 'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
+        # 'email_on_failure': True, #如果Task執行失敗的話，是否寄信
+        # 'email_on_retry': False, #如果Task重試的話，是否寄信
         'retries': 1, #最多重試的次數
         'retry_delay': timedelta(minutes=2), #每次重試中間的間隔
     },
     
 ) as dag:
-    # task_hello = PythonOperator(
-    # task_id='say_hello',
-    # python_callable=say_hello
-    # )
+    task_hello = PythonOperator(
+    task_id='say_hello',
+    python_callable=say_hello
+    )
 
     task_crawler_list = PythonOperator(
     task_id='data_crawler_list',

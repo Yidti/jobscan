@@ -361,64 +361,70 @@ class Crawler104():
 
         # 假如爬蟲暫存檔list有存在的話
         if self.df_jobs_temp is not None:
-
+            
             start_time = time.time()
-            # 讀取 parquet detail暫存檔 避免重複抓取 (讀取今日資料 排除已經爬過 & 關閉的職缺)
-            current_date = datetime.now().date()
-            today_date = datetime.now().strftime('%Y-%m-%d')
-            self.df_jobs_today = self.df_jobs_temp[self.df_jobs_temp['data_stamp'] == today_date]
 
-            # 讀取已存在的detail檔案
-            df_exist = self.load_parquet(detail=True)
-            df_close = self.load_parquet(exclude=True)
-            
-            # 抓取detail目標
-            df_scrape = self.df_jobs_today.copy()            
-            # df_scrape = df_scrape.head(10)
-            if df_exist is not None:
-                # 計算一周前的日期
-                today = datetime.now()
-                one_week_ago = today - timedelta(days=7)
-                # 確保 data_stamp 是 datetime 格式
-                df_exist['data_stamp'] = pd.to_datetime(df_exist['data_stamp'])
-                # 過濾出 data_stamp 在一周內的記錄
-                recent_ids = df_exist[df_exist['data_stamp'] >= one_week_ago].index
-                # filter in df_exist based on id
-                df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
-                print(f'目標{len(self.df_jobs_today)}筆 | 排除一週內更新，過濾剩{len(df_scrape)}筆資料', end = " | ")
-                
-                
-            if df_close is not None:
-                # 过滤掉存在于 df_close 中的 id
-                df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
-            print(f"排除無效連結或關閉職缺，過濾剩{len(df_scrape)}筆資料")    
+            # 定義計數器
+            count = 0
+            # 持續十次爬蟲
+            while count <10:
+                # 更新計數器
+                count += 1
 
-            # remove crawler
-            jobs_details = threaded_async_job.scraper(self, df_scrape)
-            
-            print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
-            df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
-            df_jobs_details.index.name = 'id'
-
-            if not df_jobs_details.empty:
-                self.df_jobs_details = df_jobs_details
-                # 爬虫爬取到的 jobs_details 放入 df_exist 中
-                # self.df_jobs = pd.concat([df_exist, df_jobs_details])
-                # self.df_jobs_details = pd.concat([df_exist, df_jobs_details])
-                # 儲存在暫存檔案裡頭 (加入日期標記）
+                # 讀取 parquet detail暫存檔 避免重複抓取 (讀取今日資料 排除已經爬過 & 關閉的職缺)
                 current_date = datetime.now().date()
-                self.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
-                # 重新排序column
-                columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
-                         "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
-                         "語文", "工具", "技能", "其他", "待遇", 
-                         "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利", "data_stamp" ]
-                self.df_jobs_details = self.df_jobs_details[columns]
-                # 儲存到 detail 暫存檔
-                self.save_parquet(self.df_jobs_details, detail=True)
-            else:
-                print("無需更新")
-            
+                today_date = datetime.now().strftime('%Y-%m-%d')
+                self.df_jobs_today = self.df_jobs_temp[self.df_jobs_temp['data_stamp'] == today_date]
+    
+                # 讀取已存在的detail檔案
+                df_exist = self.load_parquet(detail=True)
+                df_close = self.load_parquet(exclude=True)
+                
+                # 抓取detail目標
+                df_scrape = self.df_jobs_today.copy()            
+                # df_scrape = df_scrape.head(10)
+                if df_exist is not None:
+                    # 計算一周前的日期
+                    today = datetime.now()
+                    one_week_ago = today - timedelta(days=7)
+                    # 確保 data_stamp 是 datetime 格式
+                    df_exist['data_stamp'] = pd.to_datetime(df_exist['data_stamp'])
+                    # 過濾出 data_stamp 在一周內的記錄
+                    recent_ids = df_exist[df_exist['data_stamp'] >= one_week_ago].index
+                    # filter in df_exist based on id
+                    df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
+                    print(f'目標{len(self.df_jobs_today)}筆 | 排除一週內更新，過濾剩{len(df_scrape)}筆資料', end = " | ")
+                    
+                    
+                if df_close is not None:
+                    # 过滤掉存在于 df_close 中的 id
+                    df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
+                print(f"排除無效連結或關閉職缺，過濾剩{len(df_scrape)}筆資料")    
+    
+                # remove crawler
+                jobs_details = threaded_async_job.scraper(self, df_scrape)
+                
+                print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
+                df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
+                df_jobs_details.index.name = 'id'
+    
+                if not df_jobs_details.empty:
+                    self.df_jobs_details = df_jobs_details
+                    # 儲存在暫存檔案裡頭 (加入日期標記）
+                    current_date = datetime.now().date()
+                    self.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
+                    # 重新排序column
+                    columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
+                             "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
+                             "語文", "工具", "技能", "其他", "待遇", 
+                             "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利", "data_stamp" ]
+                    self.df_jobs_details = self.df_jobs_details[columns]
+                    # 儲存到 detail 暫存檔
+                    self.save_parquet(self.df_jobs_details, detail=True)
+                else:
+                    print("無需更新")
+                    break
+                    
             print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
 

@@ -12,7 +12,7 @@ import json
 import html
 import re
 from datetime import datetime
-
+import os
 # from crawler import Crawler
 
 # headers = {
@@ -227,8 +227,8 @@ async def fetch(job_item, progress_bar, driver, instance):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
     # print(link)
-    # 最多重试2次
-    for retry in range(2):
+    # 最多重试3次
+    for retry in range(3):
         try:
             # driver = crawler.configure_driver()
             driver.get(link)
@@ -242,14 +242,57 @@ async def fetch(job_item, progress_bar, driver, instance):
             pass
             # print(f"Error loading {link}, Error: {e}, retrying...")
     
-    # 測試失敗2次後加入exclude裏頭
+    # 測試失敗3次後加入exclude裏頭, 優化尋找真正的排除名單
+    # 可能性1. 職缺已關閉, 2.404頁面
+    exclude = False
+    try:
+        button = WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.CLASS_NAME, 'error-dialog__right'))
+        )
+        print(f"職缺關閉:{link}")
+        exclude = True
+    except:
+        pass
+        # print("待確認")
+
+    # 加入排除名單
+    if exclude:
+
+        job_item_dic = {job_item[0]: dict(job_item[1])}
+        df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
+        df_job_item.index.name = 'id'
     
-    job_item_dic = {job_item[0]: dict(job_item[1])}
-    df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
-    df_job_item.index.name = 'id'
+        
+        # instance.save_parquet(df_job_item, exclude=True)
+        file_name = f"{instance.user}_{instance.title}_exclude"   
+        parquet_file = f"{file_name}.parquet" 
+        parquet_path = f"temp/{parquet_file}"
+    
+        # 存入的item
+        df_jobs = df_job_item
+        if os.path.exists(parquet_path):
+            existing_df = pd.read_parquet(parquet_path)
+            combined_df = pd.concat([existing_df, df_jobs], join='inner')
+            # 將data_stamp轉換為datetime類型，以便進行排序
+            combined_df['data_stamp'] = pd.to_datetime(combined_df['data_stamp'])
+            # 按照id和data_stamp排序，保留最新的data_stamp
+            combined_df = combined_df.sort_values(by=['id', 'data_stamp'], ascending=[True, False])
+            # 刪除重複的id，只保留最新的那一條
+            combined_df = combined_df.reset_index(drop=False)
+            combined_df = combined_df.drop_duplicates(subset='id', keep='first')
+            combined_df = combined_df.set_index('id')
+        else:
+            combined_df = df_jobs
+    
+        combined_df.to_parquet(parquet_path, index=True)
 
 
-    instance.save_parquet(df_job_item, exclude=True)
+
+
+
+
+
+    
     # file_name = f"{instance.user}_{instance.title}"
     # file_name = file_name + "_exclude"
     # parquet_file = f"{file_name}.parquet" 

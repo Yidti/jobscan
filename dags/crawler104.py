@@ -3,7 +3,7 @@ import numpy as np
 import time
 import re, time, json, requests, random
 from tqdm import tqdm
-from datetime import datetime
+from datetime import datetime, timedelta
 # 爬蟲
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+from crawler import Crawler
 
 import threaded_async_job
 import os
@@ -35,7 +36,8 @@ def get_values(selected, mapping):
     values = ','.join(map(str, codes))
     return values
     
-    
+
+
 class Crawler104():
     today = datetime.now().date()
     headers = {
@@ -43,58 +45,50 @@ class Crawler104():
     }
     url = 'https://www.104.com.tw/jobs/search/?'
     
-    def __init__(self, filter_params, user="", page = 15):
+    def __init__(self, filter_params, user="",title="" , page = 15):
         self.filter_params = filter_params
         self.user = user
+        self.title = title
         self.page = page
-        # self.df_company = pd.DataFrame()
-        # self.df_industry = pd.DataFrame()
-        self.df_jobs = pd.DataFrame()
-        self.df_jobs_details = pd.DataFrame()
-        self.remote = True
-        # 假如是本機連線至遠端使用localhost
-        # self.remote_url = 'http://localhost:4444/wd/hub'
-        # change container name! 假如是container內互相連線則改成chrome
-        self.remote_url = 'http://chrome:4444/wd/hub'
         
+        self.df_jobs = pd.DataFrame()
+        self.df_jobs_temp = pd.DataFrame()
+        self.df_jobs_today = pd.DataFrame()
+        self.df_jobs_details = pd.DataFrame()
+
+        # 請依照連線狀況設定, 遠端chrome時, 有不同容器或相同容器狀況
+        self.remote = True
+        # 執行Airflow的時候要更改成Ture
+        self.diff_container = True
+        # 初步爬蟲使用
+        self.crawler = Crawler(remote=self.remote, diff_container=self.diff_container)
+        # 目前遠端有一個大問題, detail爬蟲的時候會當機
+        if self.diff_container:
+            self.temp_path = "/opt/airflow/temp/"
+        else:
+            self.temp_path = "temp/"
+
+
+    
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
         return url
-
-    def configure_driver(self, use_remote=False):
-        option = Options()
-        option.add_argument(f"user-agent={self.headers['User-Agent']}")
-        option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        option.add_argument('--headless')
-        # option.add_argument("--disable-gpu")
-
-        if use_remote:
-            # Use webdriver.Remote to connect to the Selenium Grid
-            print("use remote chrome")
-            return webdriver.Remote(
-                command_executor=self.remote_url,
-                options=option
-            )
-        else:
-            # Use local webdriver.Chrome
-            print("use local chrome")
-            return webdriver.Chrome(options=option)
-
+    
     def check_driver(self):
         try:
             # 嘗試初始化 driver
-            driver = self.configure_driver(use_remote= self.remote)
-            driver.quit()
-            print("Chrome driver is available.")
+            with self.crawler.configure_driver() as driver:
+                # driver = 
+                # driver = self.configure_driver(use_remote= self.remote)
+                # driver.quit()
+                print("Chrome driver is available.")
             return True
         except Exception as e:
             print(f"Error initializing Chrome driver: {e}")
             # 重新拋出異常，以便 Airflow 檢測到任務失敗
             raise
             # return False
-
-
     
     def load_pages(self, driver, total_page, scroll_times):
         current_page = 0
@@ -131,35 +125,39 @@ class Crawler104():
             try:
                 # 嘗試執行原本的搜尋邏輯
                 url = self.fetch_url()
-                driver = self.configure_driver(use_remote= self.remote)
-                driver.get(url)
 
-                element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
-                total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
-                # 讀取所有頁面
-                # Test model
-                total_page = 10
-                self.load_pages(driver, total_page, scroll_times=15)
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                # 讀取所有 job item
-                raw_jobs = soup.find_all("article", class_="js-job-item")
-                job_items = self.get_job_items(raw_jobs)
-                # company_items,industry_items,job_items = result_items
-                print(f'載入{len(job_items)}筆資料', end=" | ")
-                driver.quit()
+                # driver = 
 
-                # result 包含 company, industry, job (dictionary)
-                # company_items, industry_items, job_items = result_items 
-                # transfer to df and save in object
-                # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
-                # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
-                self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
-        
-                # self.df_company.index.name = 'id'
-                # self.df_industry.index.name = 'id'
-                self.df_jobs.index.name = 'id'
-
-                return True
+                with self.crawler.configure_driver() as driver: 
+                    # driver = self.configure_driver(use_remote= self.remote)
+                    driver.get(url)
+    
+                    element = driver.find_element(By.XPATH, '//*[@id="js-job-header"]/div[1]/label[1]/select/option[1]')
+                    total_page = int(re.sub(r'\D', '', element.text.split('/')[-1]))
+                    # 讀取所有頁面
+                    # test mode
+                    # total_page=15
+                    self.load_pages(driver, total_page, scroll_times=15)
+                    soup = BeautifulSoup(driver.page_source, 'html.parser')
+                    # 讀取所有 job item
+                    raw_jobs = soup.find_all("article", class_="js-job-item")
+                    job_items = self.get_job_items(raw_jobs)
+                    # company_items,industry_items,job_items = result_items
+                    print(f'載入{len(job_items)}筆資料', end=" | ")
+                    # driver.quit()
+    
+                    # result 包含 company, industry, job (dictionary)
+                    # company_items, industry_items, job_items = result_items 
+                    # transfer to df and save in object
+                    # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
+                    # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
+                    self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
+            
+                    # self.df_company.index.name = 'id'
+                    # self.df_industry.index.name = 'id'
+                    self.df_jobs.index.name = 'id'
+                    return True
+                    
             except Exception as e:
                 retry_count += 1
                 print(f'執行錯誤, retry {retry_count}, {e}')
@@ -287,102 +285,187 @@ class Crawler104():
 
         return filtered_job
 
+
+
+    def get_path(self, detail=False, exclude=False):
+        # 先讀取 parquet 暫存檔
+        file_name = f"{self.user}_{self.title}"
+        if detail:
+            file_name = file_name + "_details"
+        if exclude:
+            file_name = file_name + "_exclude"   
+        parquet_file = f"{file_name}.parquet" 
+        parquet_path = f"temp/{parquet_file}"
+        return parquet_path
+
+        
+    def load_parquet(self, detail=False, exclude=False):
+        # 先讀取 parquet 暫存檔
+        # file_name = f"{self.user}_{self.title}"
+        # if detail:
+        #     file_name = file_name + "_details"
+        # parquet_file = f"{file_name}.parquet" 
+        # parquet_path = f"temp/{parquet_file}"
+        parquet_path = self.get_path(detail = detail, exclude = exclude)
+        # print(parquet_path)
+        if os.path.exists(parquet_path):
+            existing_df = pd.read_parquet(parquet_path)
+            return existing_df
+        else:
+            print("Crawler temp file not found.")
+            return None
+
+    
+    def save_parquet(self, df_jobs, detail=False, exclude=False):
+        file_name = f"{self.user}_{self.title}"
+        if detail:
+            file_name = file_name + "_details"
+        if exclude:
+            file_name = file_name + "_exclude"
+
+        parquet_file = f"{file_name}.parquet" 
+        # self.temp_path = "/opt/airflow/temp/" or "temp/"
+        parquet_path = f"{self.temp_path}{parquet_file}"
+        
+        if os.path.exists(parquet_path):
+            existing_df = pd.read_parquet(parquet_path)
+            combined_df = pd.concat([existing_df, df_jobs], join='inner')
+            # 將data_stamp轉換為datetime類型，以便進行排序
+            combined_df['data_stamp'] = pd.to_datetime(combined_df['data_stamp'])
+            # 按照id和data_stamp排序，保留最新的data_stamp
+            combined_df = combined_df.sort_values(by=['id', 'data_stamp'], ascending=[True, False])
+            # 刪除重複的id，只保留最新的那一條
+            combined_df = combined_df.reset_index(drop=False)
+            combined_df = combined_df.drop_duplicates(subset='id', keep='first')
+            combined_df = combined_df.set_index('id')
+        else:
+            combined_df = df_jobs
+    
+        combined_df.to_parquet(parquet_path, index=True)
+
     def run(self, job_keywords=(), company_exclude=()):
         if not self.check_driver():
             print("Driver check failed. Exiting.")
             raise ValueError("Driver check failed.")
-            
+        print("Start Crawling")    
         start_time = time.time()
-        # result_items = self.search_job()
         self.search_job()
-        # result 包含 company, industry, job (dictionary)
-        # company_items, industry_items, job_items = result_items
         self.df_jobs = self.filter_job(self.df_jobs, job_keywords, company_exclude)
-        
         print(f"花費 {np.round((time.time() - start_time),2)} 秒")
-
-        # # transfer to df and save in object
-        # self.df_company = pd.DataFrame.from_dict(company_items, orient='index')
-        # self.df_industry = pd.DataFrame.from_dict(industry_items, orient='index')
-        # self.df_jobs = pd.DataFrame.from_dict(job_items, orient='index')
-
-        # self.df_company.index.name = 'id'
-        # self.df_industry.index.name = 'id'
-        # self.df_jobs.index.name = 'id'
-
-        # return filtered_jobs
-
-    
+        # 儲存在暫存檔案裡頭 (加入日期標記）
+        current_date = datetime.now().date()
+        self.df_jobs['data_stamp'] = current_date.strftime('%Y-%m-%d')
+        self.save_parquet(self.df_jobs)
 
     
     def detail(self):
+        # 先讀取 parquet list暫存檔 (沒有暫存檔就會回傳none)
+        df_temp = self.load_parquet(detail=False)
 
-        if self.df_jobs is not None:
-        
+        if df_temp is not None:
+            self.df_jobs_temp = df_temp
+        else:
+            print("Please execute run method before detail method!")
+
+        # 假如爬蟲暫存檔list有存在的話
+        if self.df_jobs_temp is not None:
+            
             start_time = time.time()
 
-            # 讀取 parquet 暫存檔 避免重複抓取 (已經爬過 & 關閉的職缺)
-            df_exist = self.read_parquet(self.user)
-            df_close = self.read_parquet("exclude")
-            # 抓取detail目標
-            df_scrape = self.df_jobs.copy()
-            
-            if df_exist is not None:
-                # 过滤掉存在于 df_exist 中的 id
-                df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
-            if df_close is not None:
-                # 过滤掉存在于 df_close 中的 id
-                df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
-            print(f"exclude exist and close data")    
-            print(f"Remove from parquet, leaving {len(df_scrape)} remaining to scrape .")
-            
-            jobs_details = threaded_async_job.scraper(df_scrape)
-            print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
-            df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
-            df_jobs_details.index.name = 'id'
+            # 定義計數器
+            count = 0
+            # 持續十次爬蟲
+            while count <10:
+                # 更新計數器
+                count += 1
 
-            # 爬虫爬取到的 jobs_details 放入 df_exist 中
-            # self.df_jobs = pd.concat([df_exist, df_jobs_details])
-            self.df_jobs_details = pd.concat([df_exist, df_jobs_details])
-
-            # 重新排序column
-            columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
-                     "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
-                     "語文", "工具", "技能", "其他", "待遇", 
-                     "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利" ]
-            self.df_jobs_details = self.df_jobs_details[columns]
-
-            # 儲存到暫存檔(會覆蓋今天的紀錄)
-            self.export_parquet()
-            
+                # 讀取 parquet detail暫存檔 避免重複抓取 (讀取今日資料 排除已經爬過 & 關閉的職缺)
+                current_date = datetime.now().date()
+                today_date = datetime.now().strftime('%Y-%m-%d')
+                self.df_jobs_today = self.df_jobs_temp[self.df_jobs_temp['data_stamp'] == today_date]
+    
+                # 讀取已存在的detail檔案
+                df_exist = self.load_parquet(detail=True)
+                df_close = self.load_parquet(exclude=True)
+                
+                # 抓取detail目標
+                df_scrape = self.df_jobs_today.copy()            
+                # df_scrape = df_scrape.head(10)
+                if df_exist is not None:
+                    # 計算一周前的日期
+                    today = datetime.now()
+                    one_week_ago = today - timedelta(days=7)
+                    # 確保 data_stamp 是 datetime 格式
+                    df_exist['data_stamp'] = pd.to_datetime(df_exist['data_stamp'])
+                    # 過濾出 data_stamp 在一周內的記錄
+                    recent_ids = df_exist[df_exist['data_stamp'] >= one_week_ago].index
+                    # filter in df_exist based on id
+                    df_scrape = df_scrape[~df_scrape.index.isin(df_exist.index)]
+                    print(f'目標{len(self.df_jobs_today)}筆 | 排除一週內更新，過濾剩{len(df_scrape)}筆資料', end = " | ")
+                    
+                    
+                if df_close is not None:
+                    # 过滤掉存在于 df_close 中的 id
+                    df_scrape = df_scrape[~df_scrape.index.isin(df_close.index)]
+                print(f"排除無效連結或關閉職缺，過濾剩{len(df_scrape)}筆資料")    
+    
+                # remove crawler
+                jobs_details = threaded_async_job.scraper(self, df_scrape)
+                
+                print(f"Scraping Details for {len(jobs_details)} Jobs", end = " | ")
+                df_jobs_details = pd.DataFrame.from_dict(jobs_details, orient='index')
+                df_jobs_details.index.name = 'id'
+    
+                if not df_jobs_details.empty:
+                    self.df_jobs_details = df_jobs_details
+                    # 儲存在暫存檔案裡頭 (加入日期標記）
+                    current_date = datetime.now().date()
+                    self.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
+                    # 重新排序column
+                    columns=["更新", "職缺",'職缺_link',"公司_id", "公司", "公司_link","產業_id", "產業",
+                             "縣市", "區域", "地址", "經歷", "學歷", "內容", "類別", "科系",
+                             "語文", "工具", "技能", "其他", "待遇", 
+                             "性質", "管理", "出差", "時段", "休假", "可上", "人數", "福利", "data_stamp" ]
+                    self.df_jobs_details = self.df_jobs_details[columns]
+                    # 儲存到 detail 暫存檔
+                    self.save_parquet(self.df_jobs_details, detail=True)
+                else:
+                    print("無需更新")
+                    break
+                    
             print(f"花費 {np.round((time.time() - start_time),2)} 秒")
 
 
-    def export_parquet(self):
-        # add Parquet file
-        current_date = datetime.now().date()    
-        parquet_file = f"{self.user}-{current_date}.parquet" 
-        parquet_path = f"temp/{parquet_file}"
-        # 将 DataFrame 存储为 Parquet 文件
-        self.df_jobs_details.to_parquet(parquet_path, index=True)
+    # # 2024.05.15 jobs list
+    # def export_jobs_list(self):
+    #     pass
+
+    
+    # def export_parquet(self):
+    #     # add Parquet file
+    #     current_date = datetime.now().date()    
+    #     parquet_file = f"{self.user}-{current_date}.parquet" 
+    #     parquet_path = f"temp/{parquet_file}"
+    #     # 将 DataFrame 存储为 Parquet 文件
+    #     self.df_jobs_details.to_parquet(parquet_path, index=True)
         
 
-    def parquet_path(self, string):
-        current_date = datetime.now().date()    
-        parquet_file = f"{string}-{current_date}.parquet" 
-        parquet_path = f"temp/{parquet_file}"
-        return parquet_path
+    # def parquet_path(self, string):
+    #     current_date = datetime.now().date()    
+    #     parquet_file = f"{string}-{current_date}.parquet" 
+    #     parquet_path = f"temp/{parquet_file}"
+    #     return parquet_path
     
-    def read_parquet(self, name):
-        path = self.parquet_path(name)
-        try:
-        # 尝试读取 Parquet 文件
-            df_exist = pd.read_parquet(path)
-            return df_exist
-        except FileNotFoundError:
-        # 如果文件不存在，则打印消息并返回 None
-            print(f"Parquet file '{path}' not found.")
-            return None
+    # def read_parquet(self, name):
+    #     path = self.parquet_path(name)
+    #     try:
+    #     # 尝试读取 Parquet 文件
+    #         df_exist = pd.read_parquet(path)
+    #         return df_exist
+    #     except FileNotFoundError:
+    #     # 如果文件不存在，则打印消息并返回 None
+    #         print(f"Parquet file '{path}' not found.")
+    #         return None
 
 
     

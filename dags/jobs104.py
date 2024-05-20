@@ -12,19 +12,21 @@ import json
 import html
 import re
 from datetime import datetime
+import os
+# from crawler import Crawler
 
-headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
-    }
-option = Options()
-# option.page_load_strategy = 'none'
-option.add_argument(f"user-agent={headers['User-Agent']}")
-# option.add_experimental_option('excludeSwitches', ['enable-automation'])
-option.add_argument('--headless') # 瀏覽器不提供頁面觀看，linux下如果系統是純文字介面不加這條會啓動失敗
-# option.add_argument('--disable-dev-shm-usage') # 使用共享內存RAM
-# option.add_argument('--disable-gpu') # 規避部分chrome gpu bug
-# option.add_experimental_option("prefs", prefs)
-option.add_argument('blink-settings=imagesEnabled=false') #不加載圖片提高效率
+# headers = {
+#         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+#     }
+# option = Options()
+# # option.page_load_strategy = 'none'
+# option.add_argument(f"user-agent={headers['User-Agent']}")
+# # option.add_experimental_option('excludeSwitches', ['enable-automation'])
+# option.add_argument('--headless') # 瀏覽器不提供頁面觀看，linux下如果系統是純文字介面不加這條會啓動失敗
+# # option.add_argument('--disable-dev-shm-usage') # 使用共享內存RAM
+# # option.add_argument('--disable-gpu') # 規避部分chrome gpu bug
+# # option.add_experimental_option("prefs", prefs)
+# option.add_argument('blink-settings=imagesEnabled=false') #不加載圖片提高效率
 
 
 def extract_script_content(soup):
@@ -176,28 +178,38 @@ def get_content(soup, job_item):
 
     return job_item
 
-async def get_info(jobs_batch, progress_bar):
+async def get_info(jobs_batch, progress_bar, crawler,instance):
     # jobs_list = [f"https:{item['href']}" for item in jobs_list]
     # jobs_list = [url.split('?')[0] for url in jobs_list]
 
     # jobs_list = [item[1]['連結'] for item in jobs_batch]
     tasks = []
     # 在異步任務之外初始化 WebDriver 實例
-    driver = webdriver.Chrome(options=option)
-
-    # 使用信号量控制并发
-    semaphore = asyncio.Semaphore(10) 
+    # driver = webdriver.Chrome(options=option)
+    # crawler = Crawler(remote=False, diff_container=False)
+    # driver = crawler.configure_driver()
+    # with crawler.configure_driver() as driver:    
+    #     # 使用信号量控制并发
+    #     semaphore = asyncio.Semaphore(10) 
+        
+    #     # for link in jobs_list:
+    #     for job_item in jobs_batch:
+    #         async with semaphore:
+    #             task = asyncio.create_task(fetch(job_item, driver, progress_bar))
+    #             tasks.append(task)
+        
+    #     results = await asyncio.gather(*tasks)
+    with crawler.configure_driver() as driver:
+        semaphore = asyncio.Semaphore(10)
+        for job_item in jobs_batch:
+            async with semaphore:
+                task = asyncio.create_task(fetch(job_item, progress_bar, driver,instance))
+                tasks.append(task)
+        results = await asyncio.gather(*tasks)
     
-    # for link in jobs_list:
-    for job_item in jobs_batch:
-        async with semaphore:
-            task = asyncio.create_task(fetch(job_item, driver, progress_bar))
-            tasks.append(task)
-    
-    results = await asyncio.gather(*tasks)
-    
-    # 退出浏览器
-    driver.quit()
+        
+        # 退出浏览器
+        # driver.quit()
     return results
 
  
@@ -211,33 +223,85 @@ def export_parquet(df):
         df.to_parquet(parquet_path, index=True)
 
 
-async def fetch(job_item, driver, progress_bar):
+async def fetch(job_item, progress_bar, driver, instance):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
+    # print(link)
+    # 最多重试3次
+    for retry in range(3):
+        try:
+            # driver = crawler.configure_driver()
+            driver.get(link)
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            job_item_detail = get_content(soup, job_item)
+            progress_bar.update(1)
+            # 成功回傳
+            return job_item_detail
+        except Exception as e:
+            pass
+            # print(f"Error loading {link}, Error: {e}, retrying...")
+    
+    # 測試失敗3次後加入exclude裏頭, 優化尋找真正的排除名單
+    # 可能性1. 職缺已關閉, 2.404頁面
+    exclude = False
     try:
-        # 最多重试3次
-        for retry in range(3):
-            try:
-                driver.get(link)
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'apply-button')))
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                job_item_detail = get_content(soup, job_item)
-                progress_bar.update(1)
+        button = WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.CLASS_NAME, 'error-dialog__right'))
+        )
+        print(f"職缺關閉:{link}")
+        exclude = True
+    except:
+        pass
+        # print("待確認")
 
-                return job_item_detail
-            
-            except Exception as e:
-                pass
-                # print(f"Error loading {link}, Error: {e}, retrying...")
-        
-        # 測試失敗後加入exclude裏頭
+    # 加入排除名單
+    if exclude:
+
         job_item_dic = {job_item[0]: dict(job_item[1])}
         df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
         df_job_item.index.name = 'id'
-        export_parquet(df_job_item)
-        # print(f"exclude {job_item[0]}")
+    
+        
+        # instance.save_parquet(df_job_item, exclude=True)
+        file_name = f"{instance.user}_{instance.title}_exclude"   
+        parquet_file = f"{file_name}.parquet" 
+        parquet_path = f"temp/{parquet_file}"
+    
+        # 存入的item
+        df_jobs = df_job_item
+        if os.path.exists(parquet_path):
+            existing_df = pd.read_parquet(parquet_path)
+            combined_df = pd.concat([existing_df, df_jobs], join='inner')
+            # 將data_stamp轉換為datetime類型，以便進行排序
+            combined_df['data_stamp'] = pd.to_datetime(combined_df['data_stamp'])
+            # 按照id和data_stamp排序，保留最新的data_stamp
+            combined_df = combined_df.sort_values(by=['id', 'data_stamp'], ascending=[True, False])
+            # 刪除重複的id，只保留最新的那一條
+            combined_df = combined_df.reset_index(drop=False)
+            combined_df = combined_df.drop_duplicates(subset='id', keep='first')
+            combined_df = combined_df.set_index('id')
+        else:
+            combined_df = df_jobs
+    
+        combined_df.to_parquet(parquet_path, index=True)
 
-    except Exception as e:
-        print(f"Error: {e}")
+
+
+
+
+
+
+    
+    # file_name = f"{instance.user}_{instance.title}"
+    # file_name = file_name + "_exclude"
+    # parquet_file = f"{file_name}.parquet" 
+    # parquet_path = f"temp/{parquet_file}"
+    # df.to_parquet(parquet_path, index=True)
+    # export_parquet(df_job_item)
+    # print(f"exclude {job_item[0]}")
+
+    # except Exception as e:
+    #     print(f"Error: {e}")
 
     return None

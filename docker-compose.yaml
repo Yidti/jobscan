@@ -78,7 +78,8 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ./temp:/temp  # 将宿主机的/tmp目录映射到容器的/tmp目录
+    # 新增 temp資料夾
+    - ${AIRFLOW_PROJ_DIR:-.}/temp:/opt/airflow/temp  
 
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:

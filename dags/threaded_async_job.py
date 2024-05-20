@@ -6,26 +6,30 @@ from datetime import datetime
 import os
 import threading
 
+from crawler import Crawler
 
-async def scrape_batch(jobs_batch, progress_bar):
+
+
+
+async def scrape_batch(jobs_batch, progress_bar, crawler, instance):
     tasks = []
     semaphore = asyncio.Semaphore(10)  # Limit concurrent requests to 10
 
     async with semaphore:
-        task = asyncio.create_task(jobs104.get_info(jobs_batch, progress_bar))
+        task = asyncio.create_task(jobs104.get_info(jobs_batch, progress_bar, crawler, instance))
         tasks.append(task)
         
     return await asyncio.gather(*tasks)
 
-def process_batch(jobs, start_idx, end_idx, all_results, progress_bar):
+def process_batch(jobs, start_idx, end_idx, all_results, progress_bar,crawler, instance):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     current_batch = jobs[start_idx:end_idx]
-    results = loop.run_until_complete(scrape_batch(current_batch, progress_bar))
+    results = loop.run_until_complete(scrape_batch(current_batch, progress_bar,crawler, instance))
     all_results.extend(results)
 
-def scraper(jobs):
+def scraper(instance, jobs):
     # 把dataframe轉成dictionary
     jobs_dict = jobs.to_dict(orient='index')
     # 把dictionary轉成list
@@ -46,9 +50,11 @@ def scraper(jobs):
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batch_size
             end_idx = min((batch_idx + 1) * batch_size, len(jobs))
-    
+
+            # 为每个线程创建一个新的 Crawler 实例
+            crawler = Crawler(remote=instance.remote, diff_container=instance.diff_container)
             # 启动一个新线程来处理当前 batch
-            thread = threading.Thread(target=process_batch, args=(jobs, start_idx, end_idx, all_results, progress_bar))
+            thread = threading.Thread(target=process_batch, args=(jobs, start_idx, end_idx, all_results, progress_bar, crawler, instance))
             thread.start()
             threads.append(thread)
     
