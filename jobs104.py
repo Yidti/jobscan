@@ -178,7 +178,7 @@ def get_content(soup, job_item):
 
     return job_item
 
-async def get_info(jobs_batch, progress_bar, crawler):
+async def get_info(jobs_batch, progress_bar, crawler,instance):
     # jobs_list = [f"https:{item['href']}" for item in jobs_list]
     # jobs_list = [url.split('?')[0] for url in jobs_list]
 
@@ -203,7 +203,7 @@ async def get_info(jobs_batch, progress_bar, crawler):
         semaphore = asyncio.Semaphore(10)
         for job_item in jobs_batch:
             async with semaphore:
-                task = asyncio.create_task(fetch(job_item, progress_bar, driver))
+                task = asyncio.create_task(fetch(job_item, progress_bar, driver,instance))
                 tasks.append(task)
         results = await asyncio.gather(*tasks)
     
@@ -223,11 +223,12 @@ def export_parquet(df):
         df.to_parquet(parquet_path, index=True)
 
 
-async def fetch(job_item, progress_bar, driver):
+async def fetch(job_item, progress_bar, driver, instance):
     # 抓取job_item裏頭的連結
     link = job_item[1]['職缺_link']
-    # 最多重试3次
-    for retry in range(3):
+    # print(link)
+    # 最多重试2次
+    for retry in range(2):
         try:
             # driver = crawler.configure_driver()
             driver.get(link)
@@ -235,17 +236,26 @@ async def fetch(job_item, progress_bar, driver):
             soup = BeautifulSoup(driver.page_source, 'html.parser')
             job_item_detail = get_content(soup, job_item)
             progress_bar.update(1)
-
+            # 成功回傳
             return job_item_detail
         except Exception as e:
             pass
             # print(f"Error loading {link}, Error: {e}, retrying...")
     
-    # 測試失敗後加入exclude裏頭
+    # 測試失敗2次後加入exclude裏頭
+    
     job_item_dic = {job_item[0]: dict(job_item[1])}
     df_job_item = pd.DataFrame.from_dict(job_item_dic, orient='index')
     df_job_item.index.name = 'id'
-    export_parquet(df_job_item)
+
+
+    instance.save_parquet(df_job_item, exclude=True)
+    # file_name = f"{instance.user}_{instance.title}"
+    # file_name = file_name + "_exclude"
+    # parquet_file = f"{file_name}.parquet" 
+    # parquet_path = f"temp/{parquet_file}"
+    # df.to_parquet(parquet_path, index=True)
+    # export_parquet(df_job_item)
     # print(f"exclude {job_item[0]}")
 
     # except Exception as e:
