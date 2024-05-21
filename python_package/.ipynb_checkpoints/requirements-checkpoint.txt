@@ -1,0 +1,4 @@
+tqdm
+selenium
+xlsxwriter
+webdriver_manager
