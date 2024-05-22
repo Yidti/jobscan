@@ -6,21 +6,22 @@ from airflow.operators.python import PythonOperator
 # test operator !!!
 # from app import say_hello
 # build opperators !!!
-# from tasks.app import say_hello
+from app import say_hello
 # from tasks.main import data_crawler_list
 from app import check_if_update
-from app import data_crawler_detail
-from app import data_lake
+# from app import data_crawler_detail
+# from app import data_lake
 from app import data_warehouse
 # from tasks.main import data_analysis
 # from tasks.imports import *
 
 from config.search_params import get_filter_params
 from crawler104 import Crawler104
+from data_lake import DataLake
 
-
-# first step
-def data_crawler_list():
+# crawler filter
+def get_crawler104():
+    # 設定爬蟲完之前的篩選條件 (for website)
     # custom filter params for search - for yidti
     role = {'ro':'全職'}
     keyword = {'keyword':"後端工程師 python"}
@@ -33,10 +34,13 @@ def data_crawler_list():
     asc = {'asc':'遞減'}
     # filter_params = get_filter_params(role, keyword, area, isnew, jobexp, mode, order, asc)
     filter_params = get_filter_params(role, keyword, isnew, jobexp, mode, order, asc)
-    # user
+    # user & title
     user = "yidti"
-    crawler = Crawler104(filter_params, user)
-    
+    title = "data_Engineer"
+    # 執行jupyter的時候在本機,遠端Remote連到 Docker的Chrome執行
+    crawler = Crawler104(filter_params, user, title, remote=True, diff_container=True)
+
+    # 設定爬蟲完之後的篩選條件(for data)
     # keywords for filter job again
     job_keywords = ('工程','資料','python','data','數據','後端')
     # Exclude keywords to filter out companies related to gambling or others that I don't want to consider.
@@ -58,45 +62,71 @@ def data_crawler_list():
                        '昱泉國際股份有限公司','博星數位股份有限公司',
                       )
     print(f"設定排除{len(company_exclude)}家公司")
+    crawler.set_filter(job_keywords, company_exclude)
+    
+    return crawler
+
+# first step - 2024/05/20
+def data_crawler_list():
+    crawler = get_crawler104()
     # run crawler
-    crawler.run(job_keywords, company_exclude)
+    crawler.run()
 
+# second step - 2024/05/21
+def data_crawler_detail():
+    crawler = get_crawler104()
+    crawler.detail()
 
+# third setp - 2024/05/21
+def data_export_list():
+    crawler = get_crawler104()
+    crawler.export_excel()
 
-
+# Fourth step - 2024/05/21
+def data_lake():
+    crawler = get_crawler104()
+    data_lake = DataLake()
+    data_lake.inital(crawler)
+    data_lake.save_nosql()
+    data_lake.filter()
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',
-    start_date = datetime(2024, 5, 1),
+    start_date = datetime(2024, 5, 19),
     schedule_interval=None,
     default_args={
         'depends_on_past': False,
-        'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
-        'email_on_failure': True, #如果Task執行失敗的話，是否寄信
-        'email_on_retry': False, #如果Task重試的話，是否寄信
+        # 'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
+        # 'email_on_failure': True, #如果Task執行失敗的話，是否寄信
+        # 'email_on_retry': False, #如果Task重試的話，是否寄信
         'retries': 1, #最多重試的次數
-        'retry_delay': timedelta(minutes=5), #每次重試中間的間隔
+        'retry_delay': timedelta(minutes=2), #每次重試中間的間隔
     },
     
 ) as dag:
-    # task_hello = PythonOperator(
-    # task_id='say_hello',
-    # python_callable=say_hello
+    # test OK!
+    task_hello = PythonOperator(
+    task_id='say_hello',
+    python_callable=say_hello
+    )
+
+    # step 1 OK!
+    # task_crawler_list = PythonOperator(
+    # task_id='data_crawler_list',
+    # python_callable=data_crawler_list
     # )
 
-    task_crawler_list = PythonOperator(
-    task_id='data_crawler_list',
-    python_callable=data_crawler_list
-    )
+    # check ??? Pending
     task_check_if_update = PythonOperator(
     task_id='check_if_update',
     python_callable=check_if_update
     )
 
-    task_crawler_detail = PythonOperator(
-    task_id='data_crawler_detail',
-    python_callable=data_crawler_detail
-    )
+    # step 2 OK!
+    # task_crawler_detail = PythonOperator(
+    # task_id='data_crawler_detail',
+    # python_callable=data_crawler_detail
+    # )
 
     task_lake = PythonOperator(
     task_id='data_lake',
@@ -112,9 +142,12 @@ with DAG(
     # task_id='data_analysis',
     # python_callable=data_analysis
     # )
-    
+   
     # logic
-    
-    task_crawler_list >> task_check_if_update
-    task_check_if_update >> task_crawler_detail >> task_lake >> task_warehouse
-    task_check_if_update >> task_lake >> task_warehouse
+    # task_hello >> task_crawler_list >> task_crawler_detail
+    # task_hello >> task_crawler_detail
+    task_hello >> task_lake
+
+    # task_crawler_list >> task_check_if_update
+    # task_check_if_update >> task_crawler_detail >> task_lake >> task_warehouse
+    # task_check_if_update >> task_lake >> task_warehouse

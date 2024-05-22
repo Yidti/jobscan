@@ -11,104 +11,127 @@ class DataLake():
         self.noSQL_DB_name = "job_db"
         self.collection_name = "jobs_104"
         self.df_jobs_details = pd.DataFrame()
+        self.crawler = None
 
-    def save_nosql(self, user, crawler:Crawler104):
-        # df = self.load_excel(user)
+    def inital(self, crawler:Crawler104):
+        # 先讀取 parquet detail暫存檔 (沒有暫存檔就會回傳none)
+        df_temp = crawler.load_parquet(detail=True)
+        if df_temp is not None:
+            self.df_jobs_details = df_temp
+        else:
+            print("Please execute crawler's detail method before datalake's run method!")
 
-        current_date = datetime.now().date()
-        crawler.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
-
-        df_jobs = crawler.df_jobs_details.copy()
-        # df_jobs.merge(crawler.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_job', '_company'))
-        # df_jobs.merge(crawler.df_company[['公司']], left_on='公司', right_index=True, how='left', suffixes=('_id', '_name'))
-        # df_jobs.merge(crawler.df_industry[['產業']], left_on='產業', right_index=True, how='left', suffixes=('_id', '_name'))
+        # 假如在
+        if crawler.diff_container:
+            self.mongo_url = "mongodb://root:example@host.docker.internal:27018/"
+        else:
+            self.mongo_url = "mongodb://root:example@localhost:27018/"
+            
+    def save_nosql(self):
         
-        self.upload_collection(df_jobs)
+        if self.df_jobs_details is not None:
+            # current_date = datetime.now().date()
+            # crawler.df_jobs_details['data_stamp'] = current_date.strftime('%Y-%m-%d')
+            df_jobs = self.df_jobs_details.copy()
+            self.upload_collection(df_jobs)
     
     def upload_collection(self, df):
-        client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = client[self.noSQL_DB_name]
-        collection = db[self.collection_name]
-        
-        data = df.reset_index().to_dict(orient="records")
-
-        new_count, update_count = 0, 0
-        for idx, record in enumerate(data):
-            try:
-                filter_query = {"id": record["id"]}
-                existing_record = collection.find_one(filter_query)
-                # 已存在就更新, 不存在就插入
-                if existing_record is None:
-                    new_count += 1
-                    collection.insert_one(record)
-                else:
-                    update_count += 1
-                    collection.replace_one(filter_query, record)
-            except Exception as e:
-                print(f"{idx},{e}")
-                
-        print(f'Update {update_count} records, Insert {new_count} records in {self.collection_name} collection')
-
+        try: 
+            client = pymongo.MongoClient(self.mongo_url)
+            db = client[self.noSQL_DB_name]
+            collection = db[self.collection_name]
+            
+            data = df.reset_index().to_dict(orient="records")
+    
+            new_count, update_count = 0, 0
+            for idx, record in enumerate(data):
+                try:
+                    filter_query = {"id": record["id"]}
+                    existing_record = collection.find_one(filter_query)
+                    # 已存在就更新, 不存在就插入
+                    if existing_record is None:
+                        new_count += 1
+                        collection.insert_one(record)
+                    else:
+                        update_count += 1
+                        collection.replace_one(filter_query, record)
+                except Exception as e:
+                    print(f"{idx},{e}")
+                    
+            print(f'Update {update_count} records, Insert {new_count} records in {self.collection_name} collection')
+        except Exception as e:
+            print(f"Failed to connect to MongoDB: {e}")
     
 
     def load_all(self):
-        client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = client[self.noSQL_DB_name]
-        collection = db[self.collection_name]
+        try: 
+            client = pymongo.MongoClient(self.mongo_url)
+            db = client[self.noSQL_DB_name]
+            collection = db[self.collection_name]
+            
+            data_list = list(collection.find({}, {"_id": 0}))  # 返回整個集合的所有文檔，排除 _id 欄位
+            
+            if data_list:
+                df_jobs = pd.DataFrame(data_list)
+                df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
+            else:
+                print("No data found in the collection.")
+                df_jobs = pd.DataFrame()  # 返回一個空的 DataFrame
         
-        data_list = list(collection.find({}, {"_id": 0}))  # 返回整個集合的所有文檔，排除 _id 欄位
-        
-        if data_list:
-            df_jobs = pd.DataFrame(data_list)
-            df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
-        else:
-            print("No data found in the collection.")
-            df_jobs = pd.DataFrame()  # 返回一個空的 DataFrame
-    
-        return df_jobs
+            return df_jobs
+            
+        except Exception as e:
+            print(f"Failed to connect to MongoDB: {e}")
+
 
     def load_latest(self):
-        client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = client[self.noSQL_DB_name]
-        collection = db[self.collection_name]
-        
-        stamp = collection.find_one(
-            filter= {}, # 返回集合中的所有文檔
-            sort=[("data stamp", -1)], # 按照字段進行降序排序。 -1 表示降序排列，1 表示升序排列
-            projection={"_id": 0, "data stamp": 1}) # 指定了返回的文檔中的欄位, 0 表示排除, 1代表返回
-        latest_stamp = stamp['data stamp']
-        data_list = list(collection.find({"data stamp": {"$eq": latest_stamp}})) #  $eq（equal to）操作符
-        if data_list:
-            df_jobs = pd.DataFrame(data_list)
-            df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
-            df_jobs = df_jobs.drop(["_id", "data stamp"], axis = 1)
-        
-        return df_jobs
-    
+        try: 
+            client = pymongo.MongoClient(self.mongo_url)
+            db = client[self.noSQL_DB_name]
+            collection = db[self.collection_name]
+            
+            stamp = collection.find_one(
+                filter= {}, # 返回集合中的所有文檔
+                sort=[("data stamp", -1)], # 按照字段進行降序排序。 -1 表示降序排列，1 表示升序排列
+                projection={"_id": 0, "data stamp": 1}) # 指定了返回的文檔中的欄位, 0 表示排除, 1代表返回
+            latest_stamp = stamp['data stamp']
+            data_list = list(collection.find({"data stamp": {"$eq": latest_stamp}})) #  $eq（equal to）操作符
+            if data_list:
+                df_jobs = pd.DataFrame(data_list)
+                df_jobs.set_index("id", inplace=True)  # 在這裡使用 set_index 方法將 id 設置為索引
+                df_jobs = df_jobs.drop(["_id", "data stamp"], axis = 1)
+            
+            return df_jobs
+        except Exception as e:
+            print(f"Failed to connect to MongoDB: {e}")
 
 
     def filter(self, job_keywords=(), company_exclude=()):
-        client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = client[self.noSQL_DB_name]
-        collection = db[self.collection_name]
-        
-        def run_job_keywords(collection, job_keywords):
-            # 構建正則表達式
-            regex_pattern = '|'.join(job_keywords)
-            # 刪除不符合關鍵字的文件
-            delete_query = {'職缺': {'$not': {'$regex': regex_pattern, '$options': 'i'}}}
-            delete_result = collection.delete_many(delete_query)
-            print("job keywords - 已刪除不符合關鍵字的文件數量:", delete_result.deleted_count)
 
-        def run_company_exclude(collection, company_exclude):
-            # 構建要刪除的文件的查詢條件
-            delete_query = {'公司': {'$in': company_exclude}}
-            # 刪除符合條件的文件
-            delete_result = collection.delete_many(delete_query)
-            print("company exclude - 已刪除符合條件的文件數量:", delete_result.deleted_count)
-        
-        run_job_keywords(collection, job_keywords)
-        run_company_exclude(collection, company_exclude)
+        try:
+            client = pymongo.MongoClient(self.mongo_url)
+            db = client[self.noSQL_DB_name]
+            collection = db[self.collection_name]
+            
+            def run_job_keywords(collection, job_keywords):
+                # 構建正則表達式
+                regex_pattern = '|'.join(job_keywords)
+                # 刪除不符合關鍵字的文件
+                delete_query = {'職缺': {'$not': {'$regex': regex_pattern, '$options': 'i'}}}
+                delete_result = collection.delete_many(delete_query)
+                print("job keywords - 已刪除不符合關鍵字的文件數量:", delete_result.deleted_count)
+    
+            def run_company_exclude(collection, company_exclude):
+                # 構建要刪除的文件的查詢條件
+                delete_query = {'公司': {'$in': company_exclude}}
+                # 刪除符合條件的文件
+                delete_result = collection.delete_many(delete_query)
+                print("company exclude - 已刪除符合條件的文件數量:", delete_result.deleted_count)
+            
+            run_job_keywords(collection, job_keywords)
+            run_company_exclude(collection, company_exclude)
+        except Exception as e:
+            print(f"Failed to connect to MongoDB: {e}")
     
     def load_excel(self, user):
         # Load excel

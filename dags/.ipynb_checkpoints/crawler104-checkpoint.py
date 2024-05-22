@@ -45,7 +45,7 @@ class Crawler104():
     }
     url = 'https://www.104.com.tw/jobs/search/?'
     
-    def __init__(self, filter_params, user="",title="" , page = 15):
+    def __init__(self, filter_params, user="",title="" , page = 15, remote=True, diff_container=True):
         self.filter_params = filter_params
         self.user = user
         self.title = title
@@ -57,19 +57,27 @@ class Crawler104():
         self.df_jobs_details = pd.DataFrame()
 
         # 請依照連線狀況設定, 遠端chrome時, 有不同容器或相同容器狀況
-        self.remote = True
+        self.remote = remote
         # 執行Airflow的時候要更改成Ture
-        self.diff_container = True
+        self.diff_container = diff_container
         # 初步爬蟲使用
         self.crawler = Crawler(remote=self.remote, diff_container=self.diff_container)
-        # 目前遠端有一個大問題, detail爬蟲的時候會當機
+        # 目前遠端有一個大問題, detail爬蟲的時候會當機 (修復完畢)
         if self.diff_container:
             self.temp_path = "/opt/airflow/dags/temp/"
+            self.output_path = "/opt/airflow/dags/output/"
         else:
             self.temp_path = "temp/"
+            self.output_path = "output/"
+        
+        # 爬完蟲之後的篩選條件
+        self.job_keywords = None
+        self.company_exclude = None
 
+    def set_filter(self, job_keywords, company_exclude):
+        self.job_keywords = job_keywords
+        self.company_exclude = company_exclude
 
-    
     def fetch_url(self):
         url = requests.get(self.url, self.filter_params, headers=self.headers).url
         print(f"url: {url}")
@@ -213,27 +221,6 @@ class Crawler104():
                 job_city = job_area
                 job_region = None
             
-            # # 收集 item
-            #  # 檢查並加入 company_items
-            # if company_no not in company_items:
-            #     company_items[company_no] = {
-            #         # "id": company_no,
-            #         "公司": company_name,
-            #         "link": company_link,
-            #     }
-            # else:
-            #     # print(f"{company_name}({company_no}) repeated ")
-            #     pass
-            
-            # # 檢查並加入 industry_items
-            # if industry_no not in industry_items:
-            #     industry_items[industry_no] = {
-            #         # "id": industry_no,
-            #         "產業": industry_name
-            #     }
-            # else:
-            #     # print(f"{industry_name}({industry_no}) repeated ")
-            #     pass
             
             # 檢查並加入 job_items
             if job_no not in job_items:
@@ -295,7 +282,7 @@ class Crawler104():
         if exclude:
             file_name = file_name + "_exclude"   
         parquet_file = f"{file_name}.parquet" 
-        parquet_path = f"temp/{parquet_file}"
+        parquet_path = f"{self.temp_path}/{parquet_file}"
         return parquet_path
 
         
@@ -343,33 +330,39 @@ class Crawler104():
     
         combined_df.to_parquet(parquet_path, index=True)
 
-    def run(self, job_keywords=(), company_exclude=()):
+    # def run(self, job_keywords=(), company_exclude=()):
+    def run(self):
+
         if not self.check_driver():
             print("Driver check failed. Exiting.")
             raise ValueError("Driver check failed.")
-        print("Start Crawling")    
-        start_time = time.time()
-        self.search_job()
-        self.df_jobs = self.filter_job(self.df_jobs, job_keywords, company_exclude)
-        print(f"花費 {np.round((time.time() - start_time),2)} 秒")
-        # 儲存在暫存檔案裡頭 (加入日期標記）
-        current_date = datetime.now().date()
-        self.df_jobs['data_stamp'] = current_date.strftime('%Y-%m-%d')
-        self.save_parquet(self.df_jobs)
+
+        if (self.job_keywords is not None) and (self.company_exclude is not None):
+            print("Start Crawling")    
+            start_time = time.time()
+            self.search_job()
+            self.df_jobs = self.filter_job(self.df_jobs, self.job_keywords, self.company_exclude)
+            print(f"花費 {np.round((time.time() - start_time),2)} 秒")
+            # 儲存在暫存檔案裡頭 (加入日期標記）
+            current_date = datetime.now().date()
+            self.df_jobs['data_stamp'] = current_date.strftime('%Y-%m-%d')
+            self.save_parquet(self.df_jobs)
+        else: 
+            print("Setting Filtter")
 
     
     def detail(self):
         # 先讀取 parquet list暫存檔 (沒有暫存檔就會回傳none)
         df_temp = self.load_parquet(detail=False)
-
+        # print('test',df_temp)
         if df_temp is not None:
             self.df_jobs_temp = df_temp
         else:
             print("Please execute run method before detail method!")
 
         # 假如爬蟲暫存檔list有存在的話
-        if self.df_jobs_temp is not None:
-            
+        if all([self.df_jobs_temp is not None, self.company_exclude is not None, self.job_keywords is not None]):
+
             start_time = time.time()
 
             # 定義計數器
@@ -434,70 +427,45 @@ class Crawler104():
                     break
                     
             print(f"花費 {np.round((time.time() - start_time),2)} 秒")
-
-
-    # # 2024.05.15 jobs list
-    # def export_jobs_list(self):
-    #     pass
-
-    
-    # def export_parquet(self):
-    #     # add Parquet file
-    #     current_date = datetime.now().date()    
-    #     parquet_file = f"{self.user}-{current_date}.parquet" 
-    #     parquet_path = f"temp/{parquet_file}"
-    #     # 将 DataFrame 存储为 Parquet 文件
-    #     self.df_jobs_details.to_parquet(parquet_path, index=True)
-        
-
-    # def parquet_path(self, string):
-    #     current_date = datetime.now().date()    
-    #     parquet_file = f"{string}-{current_date}.parquet" 
-    #     parquet_path = f"temp/{parquet_file}"
-    #     return parquet_path
-    
-    # def read_parquet(self, name):
-    #     path = self.parquet_path(name)
-    #     try:
-    #     # 尝试读取 Parquet 文件
-    #         df_exist = pd.read_parquet(path)
-    #         return df_exist
-    #     except FileNotFoundError:
-    #     # 如果文件不存在，则打印消息并返回 None
-    #         print(f"Parquet file '{path}' not found.")
-    #         return None
-
-
     
     def export_excel(self):
-        user = self.user
-        df_jobs_output = self.df_jobs_details
-        # 匯入company link的資料 
-        # df_jobs_output = pd.merge(df_jobs_output, self.df_company[['link']], left_on='公司', right_index=True, how='left', suffixes=('_jobs', '_company'))
 
-        # 將id取代成name
-        # df_jobs_output['公司'] = df_jobs_output['公司'].replace(self.df_company['公司'].to_dict())
-        # df_jobs_output['產業'] = df_jobs_output['產業'].replace(self.df_industry['產業'].to_dict())
+        # 先讀取 parquet detail暫存檔 (沒有暫存檔就會回傳none)
+        df_temp = self.load_parquet(detail=True)
+        if df_temp is not None:
+            self.df_jobs_details = df_temp
+        else:
+            print("Please execute detail method before export_excel method!")
 
-        column_list = ["公司_id", "產業_id"]
-        for column_to_drop in column_list:
-            if column_to_drop in df_jobs_output.columns:
-                df_jobs_output = df_jobs_output.drop(column_to_drop,axis= 1)
-        df_jobs_output.replace(r'=\w+', '', regex=True, inplace=True)
+        if self.df_jobs_details is not None:
+            df_jobs_output = self.df_jobs_details
+    
+            column_list = ["公司_id", "產業_id"]
+            for column_to_drop in column_list:
+                if column_to_drop in df_jobs_output.columns:
+                    df_jobs_output = df_jobs_output.drop(column_to_drop,axis= 1)
+            df_jobs_output.replace(r'=\w+', '', regex=True, inplace=True)
 
-        # 儲存 excel
-        current_date = datetime.now().date()    
-        xlsx_file = f"{user}-{current_date}"
-        xlsx_path = f'output/{xlsx_file}.xlsx'
-        # 先删除现有文件（如果存在）
-        if os.path.exists(xlsx_path):
-            os.remove(xlsx_path)
-        # 然后保存新文件        
-        try:
-            df_jobs_output.to_excel(xlsx_path, sheet_name=xlsx_file, index=True, index_label='id', engine='xlsxwriter')
-            print(f"CSV文件保存成功: {xlsx_path}")
-        except PermissionError as e:
-            print(f"无法保存文件: {e}")
+            # 修改日期格式
+            df_jobs_output['data_stamp'] = pd.to_datetime(df_jobs_output['data_stamp'])
+            df_jobs_output['data_stamp'] = df_jobs_output['data_stamp'].dt.date
+
+            # 儲存 excel (每個月換一個檔案)
+            current_date = datetime.now().date()
+            year_month = current_date.strftime('%Y_%m')
+
+            file_name = f"{self.user}_{self.title}_{year_month}"   
+            xlsx_file = f"{file_name}" 
+            xlsx_path = f'{self.output_path}/{xlsx_file}.xlsx'
+            # 先删除现有文件（如果存在）
+            if os.path.exists(xlsx_path):
+                os.remove(xlsx_path)
+            # 然后保存新文件        
+            try:
+                df_jobs_output.to_excel(xlsx_path, sheet_name=xlsx_file, index=True, index_label='id', engine='xlsxwriter')
+                print(f"Excel文件儲存成功: {xlsx_path}")
+            except PermissionError as e:
+                print(f"無法保存文件: {e}")
 
 
         # output_filename = f'output_{current_date}.csv'

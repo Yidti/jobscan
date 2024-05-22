@@ -9,17 +9,19 @@ from airflow.operators.python import PythonOperator
 from app import say_hello
 # from tasks.main import data_crawler_list
 from app import check_if_update
-from app import data_crawler_detail
-from app import data_lake
+# from app import data_crawler_detail
+# from app import data_lake
 from app import data_warehouse
 # from tasks.main import data_analysis
 # from tasks.imports import *
 
 from config.search_params import get_filter_params
 from crawler104 import Crawler104
+from data_lake import DataLake
 
-
+# crawler filter
 def get_crawler104():
+    # 設定爬蟲完之前的篩選條件 (for website)
     # custom filter params for search - for yidti
     role = {'ro':'全職'}
     keyword = {'keyword':"後端工程師 python"}
@@ -35,13 +37,10 @@ def get_crawler104():
     # user & title
     user = "yidti"
     title = "data_Engineer"
-    crawler = Crawler104(filter_params, user, title)
-    return crawler
+    # 執行jupyter的時候在本機,遠端Remote連到 Docker的Chrome執行
+    crawler = Crawler104(filter_params, user, title, remote=True, diff_container=True)
 
-# first step - 2024/05/20
-def data_crawler_list():
-    crawler = get_crawler104()
-    
+    # 設定爬蟲完之後的篩選條件(for data)
     # keywords for filter job again
     job_keywords = ('工程','資料','python','data','數據','後端')
     # Exclude keywords to filter out companies related to gambling or others that I don't want to consider.
@@ -63,14 +62,33 @@ def data_crawler_list():
                        '昱泉國際股份有限公司','博星數位股份有限公司',
                       )
     print(f"設定排除{len(company_exclude)}家公司")
-    # run crawler
-    crawler.run(job_keywords, company_exclude)
-
-
-# # second step
-# def data_crawler_detail():
-#     crawler = initail_filter()
+    crawler.set_filter(job_keywords, company_exclude)
     
+    return crawler
+
+# first step - 2024/05/20
+def data_crawler_list():
+    crawler = get_crawler104()
+    # run crawler
+    crawler.run()
+
+# second step - 2024/05/21
+def data_crawler_detail():
+    crawler = get_crawler104()
+    crawler.detail()
+
+# third setp - 2024/05/21
+def data_export_list():
+    crawler = get_crawler104()
+    crawler.export_excel()
+
+# Fourth step - 2024/05/21
+def data_lake():
+    crawler = get_crawler104()
+    data_lake = DataLake()
+    data_lake.inital(crawler)
+    data_lake.save_nosql()
+    data_lake.filter()
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',
@@ -86,24 +104,29 @@ with DAG(
     },
     
 ) as dag:
+    # test OK!
     task_hello = PythonOperator(
     task_id='say_hello',
     python_callable=say_hello
     )
 
-    task_crawler_list = PythonOperator(
-    task_id='data_crawler_list',
-    python_callable=data_crawler_list
-    )
+    # step 1 OK!
+    # task_crawler_list = PythonOperator(
+    # task_id='data_crawler_list',
+    # python_callable=data_crawler_list
+    # )
+
+    # check ??? Pending
     task_check_if_update = PythonOperator(
     task_id='check_if_update',
     python_callable=check_if_update
     )
 
-    task_crawler_detail = PythonOperator(
-    task_id='data_crawler_detail',
-    python_callable=data_crawler_detail
-    )
+    # step 2 OK!
+    # task_crawler_detail = PythonOperator(
+    # task_id='data_crawler_detail',
+    # python_callable=data_crawler_detail
+    # )
 
     task_lake = PythonOperator(
     task_id='data_lake',
@@ -119,9 +142,12 @@ with DAG(
     # task_id='data_analysis',
     # python_callable=data_analysis
     # )
-    
+   
     # logic
-    
-    task_crawler_list >> task_check_if_update
-    task_check_if_update >> task_crawler_detail >> task_lake >> task_warehouse
-    task_check_if_update >> task_lake >> task_warehouse
+    # task_hello >> task_crawler_list >> task_crawler_detail
+    # task_hello >> task_crawler_detail
+    task_hello >> task_lake
+
+    # task_crawler_list >> task_check_if_update
+    # task_check_if_update >> task_crawler_detail >> task_lake >> task_warehouse
+    # task_check_if_update >> task_lake >> task_warehouse

@@ -1,6 +1,7 @@
 # search_params.py
 
 import json
+import os
 
 def get_filter_params(*args):
 
@@ -10,7 +11,10 @@ def get_filter_params(*args):
         return values
     
     # Load search params mapping from JSON file
-    with open('./config/search_params_mapping.json', 'r', encoding='utf-8') as file:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(base_path, 'search_params_mapping.json')
+
+    with open(json_path, 'r', encoding='utf-8') as file:
         mappings = json.load(file)
 
     filter_params = {}
