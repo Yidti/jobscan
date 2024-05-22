@@ -4,28 +4,28 @@
 -- company = 公司
 -- company_link = 公司_link
 CREATE TABLE IF NOT EXISTS company(  
-    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     company_id BIGINT NOT NULL,
     company_name VARCHAR(255) NOT NULL,
-    company_link VARCHAR(255),
-    UNIQUE (company_id)
+    company_link VARCHAR(255) NOT NULL, 
+    UNIQUE (company_id, company_name, company_link)
 );
 
 -- industry table
     -- industry_id = 產業_id
     -- industry = 產業
 CREATE TABLE IF NOT EXISTS industry(  
-    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     industry_id BIGINT NOT NULL,
     industry_name VARCHAR(255) NOT NULL,
-    UNIQUE (industry_id)
+    UNIQUE (industry_id, industry_name)
 );
 
 -- location_city_region table
     -- city = 縣市
     -- region = 區域
 CREATE TABLE IF NOT EXISTS location_city_region(
-    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     city VARCHAR(255) NOT NULL,
     region VARCHAR(255),
     UNIQUE (city, region),
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS location_city_region(
     -- city_region_id = 城市與區域
     -- address = 地址
 CREATE TABLE IF NOT EXISTS location(
-    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    city_region_id INT NOT NULL,
+    id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    city_region_id BIGINT NOT NULL,
     address VARCHAR(255) NOT NULL,
     FOREIGN KEY (city_region_id) REFERENCES location_city_region(id)
 );

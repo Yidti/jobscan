@@ -3,24 +3,18 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# test operator !!!
-# from app import say_hello
-# build opperators !!!
-from app import say_hello
-# from tasks.main import data_crawler_list
-from app import check_if_update
-# from app import data_crawler_detail
-# from app import data_lake
-from app import data_warehouse
-# from tasks.main import data_analysis
-# from tasks.imports import *
-
 from config.search_params import get_filter_params
 from crawler104 import Crawler104
 from data_lake import DataLake
+from data_warehouse import DataWarehouse
+
+# 設定連線方式
+remote=True
+diff_container=True
 
 # crawler filter
 def get_crawler104():
+    global remote, diff_container
     # 設定爬蟲完之前的篩選條件 (for website)
     # custom filter params for search - for yidti
     role = {'ro':'全職'}
@@ -38,7 +32,7 @@ def get_crawler104():
     user = "yidti"
     title = "data_Engineer"
     # 執行jupyter的時候在本機,遠端Remote連到 Docker的Chrome執行
-    crawler = Crawler104(filter_params, user, title, remote=True, diff_container=True)
+    crawler = Crawler104(filter_params, user, title, remote=remote, diff_container=diff_container)
 
     # 設定爬蟲完之後的篩選條件(for data)
     # keywords for filter job again
@@ -66,34 +60,40 @@ def get_crawler104():
     
     return crawler
 
-# first step - 2024/05/20
+# step 1 - 2024/05/20
 def data_crawler_list():
     crawler = get_crawler104()
-    # run crawler
     crawler.run()
 
-# second step - 2024/05/21
+# step 2 - 2024/05/21
 def data_crawler_detail():
     crawler = get_crawler104()
     crawler.detail()
 
-# third setp - 2024/05/21
-def data_export_list():
+# step 2.5 - 2024/05/21
+def data_export_excel():
     crawler = get_crawler104()
     crawler.export_excel()
 
-# Fourth step - 2024/05/21
+# step 3 - 2024/05/21
 def data_lake():
     crawler = get_crawler104()
-    data_lake = DataLake()
-    data_lake.inital(crawler)
+    data_lake = DataLake(crawler)
     data_lake.save_nosql()
     data_lake.filter()
+
+# step 4 - 2024/05/22
+def data_warehouse():
+    crawler = get_crawler104()
+    data_lake = DataLake(crawler)
+    
+    data_Warehouse = DataWarehouse(data_lake)
+    data_Warehouse.save_sql()
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',
     start_date = datetime(2024, 5, 19),
-    schedule_interval=None,
+    schedule_interval="0 19 * * *",  # 每天晚上19點執行一次
     default_args={
         'depends_on_past': False,
         # 'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
@@ -104,30 +104,26 @@ with DAG(
     },
     
 ) as dag:
-    # test OK!
-    task_hello = PythonOperator(
-    task_id='say_hello',
-    python_callable=say_hello
-    )
 
     # step 1 OK!
-    # task_crawler_list = PythonOperator(
-    # task_id='data_crawler_list',
-    # python_callable=data_crawler_list
-    # )
-
-    # check ??? Pending
-    task_check_if_update = PythonOperator(
-    task_id='check_if_update',
-    python_callable=check_if_update
+    task_crawler_list = PythonOperator(
+    task_id='data_crawler_list',
+    python_callable=data_crawler_list
     )
 
     # step 2 OK!
-    # task_crawler_detail = PythonOperator(
-    # task_id='data_crawler_detail',
-    # python_callable=data_crawler_detail
-    # )
+    task_crawler_detail = PythonOperator(
+    task_id='data_crawler_detail',
+    python_callable=data_crawler_detail
+    )
 
+    # step 2.5 OK! 
+    task_export_excel = PythonOperator(
+    task_id='data_export_excel',
+    python_callable=data_export_excel
+    )
+
+    # step 3 OK!
     task_lake = PythonOperator(
     task_id='data_lake',
     python_callable=data_lake
@@ -143,11 +139,5 @@ with DAG(
     # python_callable=data_analysis
     # )
    
-    # logic
-    # task_hello >> task_crawler_list >> task_crawler_detail
-    # task_hello >> task_crawler_detail
-    task_hello >> task_lake
-
-    # task_crawler_list >> task_check_if_update
-    # task_check_if_update >> task_crawler_detail >> task_lake >> task_warehouse
-    # task_check_if_update >> task_lake >> task_warehouse
+    task_crawler_list >> task_crawler_detail >> task_lake >> task_warehouse
+    task_crawler_detail >> task_export_excel

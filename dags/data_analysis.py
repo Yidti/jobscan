@@ -42,17 +42,20 @@ class SingletonMeta(type):
 
 
 class DataAnalysis(metaclass=SingletonMeta):
-    def __init__(self):
-        self.engine = self.connect()   
+    def __init__(self, data_Warehouse):
+        self.engine = data_Warehouse.connect()
+
         
-    def connect(self):
-            # 对密码进行 URL 编码
-            password = urllib.parse.quote_plus('Sql@1031')
-            # 创建 SQLAlchemy 引擎
-            db_name = "job_db"
-            # 创建 SQLAlchemy 引擎
-            engine = create_engine(f'mysql+mysqlconnector://root:{password}@localhost:3306/{db_name}')
-            return engine
+        # self.engine = self.connect()   
+        
+    # def connect(self):
+    #         # 对密码进行 URL 编码
+    #         password = urllib.parse.quote_plus('Sql@1031')
+    #         # 创建 SQLAlchemy 引擎
+    #         db_name = "job_db"
+    #         # 创建 SQLAlchemy 引擎
+    #         engine = create_engine(f'mysql+mysqlconnector://root:{password}@localhost:3306/{db_name}')
+    #         return engine
 
     def read_sql(self, table_name):
         existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)
@@ -306,8 +309,8 @@ class DataAnalysis(metaclass=SingletonMeta):
 
     def tool_count(self, df):
         # 將 NaN 值填充為空字符串
-        df['tool'].fillna("", inplace=True)
-        
+        # df['tool'].fillna("", inplace=True)
+        df.fillna({'tool': ""}, inplace=True)
         # 定義常見軟體業tool
         tool = {
             'Python': 0, 'C++': 0, 'Java': 0, 'JavaScript': 0, 'R':0,
@@ -328,7 +331,8 @@ class DataAnalysis(metaclass=SingletonMeta):
         
         # 將計數字典轉換為 DataFrame
         df_tool = pd.DataFrame.from_dict({'tool': list(tool.keys()), 'count': list(tool.values())})
-        
+
+
         # 移除 count 欄位小於五的行
         df_tool = df_tool[df_tool['count'] >= 5]
         

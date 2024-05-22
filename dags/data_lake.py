@@ -7,14 +7,16 @@ from crawler104 import Crawler104
 
 class DataLake():
 
-    def __init__(self):
+    def __init__(self, crawler:Crawler104):
         self.noSQL_DB_name = "job_db"
         self.collection_name = "jobs_104"
         self.df_jobs_details = pd.DataFrame()
-        self.crawler = None
+        self.crawler = crawler
+        self.initail()
 
-    def inital(self, crawler:Crawler104):
+    def initail(self):
         # 先讀取 parquet detail暫存檔 (沒有暫存檔就會回傳none)
+        crawler = self.crawler
         df_temp = crawler.load_parquet(detail=True)
         if df_temp is not None:
             self.df_jobs_details = df_temp

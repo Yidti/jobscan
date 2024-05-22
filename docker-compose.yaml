@@ -60,8 +60,23 @@ services:
       start_period: 5s
     restart: always
     volumes:
-      - mongodb-data:/data/db    
-  
+      - mongodb-db:/data/db    
+  # Data Warehouse
+  mysqldb:
+    image: mysql:8.0
+    container_name: mysqldb
+    restart: always
+    environment:
+        MYSQL_DATABASE: 'job_db'
+        MYSQL_USER: 'user'
+        MYSQL_PASSWORD: 'test'
+        MYSQL_ROOT_PASSWORD: 'test'
+    ports: 
+    - '3308:3306'
+    # 設定 mysql 使用原生認證的密碼 hash
+    command: mysqld --default-authentication-plugin=mysql_native_password
+    volumes:
+        - mysql-db:/var/lib/mysql
   postgres:
     image: postgres:13
     environment:
@@ -263,5 +278,5 @@ services:
 volumes:
   postgres-db-volume:
   # 新增
-  mongodb-data:
-
+  mongodb-db:
+  mysql-db:

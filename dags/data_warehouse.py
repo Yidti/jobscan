@@ -6,7 +6,10 @@ import urllib.parse
 import pandas as pd
 from data_lake import DataLake
 import time
-        
+
+# mysql.connector 直接與 MySQL 進行連接，主要用於執行原始 SQL 語句，適合對資料庫進行低級別操作，如創建資料庫、執行查詢等。
+# SQLAlchemy 則更高級，提供了 ORM 能力，可以通過 Python 類和對象來操作資料庫，適合需要對資料庫進行高級操作和管理的大型應用程序。
+
 class SingletonMeta(type):
     _instances = {}
     
@@ -16,21 +19,38 @@ class SingletonMeta(type):
         return cls._instances[cls]
 
 class DataWarehouse(metaclass=SingletonMeta):
-    def __init__(self):
+    def __init__(self, data_lake:DataLake):
         # 'dimension.sql' & 'facts.sql'
         self.sql_script={}
         self.df_no_sql = pd.DataFrame()
         self.df_sql = pd.DataFrame()
-        self.engine = self.connect()
         self.db_name = "job_db"
-        self.host="localhost"
-        self.user = "root"
-        self.password = "Sql@1031"
-        self.port = 3306
+        self.data_lake = data_lake
+        self.crawler = data_lake.crawler
+        self.user = 'root'
+        self.password = 'test'
+        if not self.crawler.remote:
+            self.host = 'localhost'
+            self.port = 3306  # 預設值
+            self.mysql_url = f'mysql+mysqlconnector://{self.user}:{self.password}@{self.host}:{self.port}/{self.db_name}'
+        else:
+            if not self.crawler.diff_container:
+                self.host = 'localhost'
+                self.port = 3308
+                self.mysql_url = f'mysql+mysqlconnector://{self.user}:{self.password}@{self.host}:{self.port}/{self.db_name}'
+            else:
+                self.host = 'mysqldb'
+                self.port = 3306 # container 內部連線
+                self.mysql_url = f'mysql+mysqlconnector://{self.user}:{self.password}@{self.host}:{self.port}/{self.db_name}'
+                print(self.mysql_url)
+        self.engine = self.connect()
+        self.initial()
 
-    def initial_db(self):
+
+    def initial(self):
         # self.deleteDB(self.db_name)
         self.createDB(self.db_name)
+        print('createDB')
         self.read_sql_file()
         db_name = self.db_name
         sql_dimension = self.sql_script['dimension.sql']
@@ -38,27 +58,30 @@ class DataWarehouse(metaclass=SingletonMeta):
         self.execute_sql(db_name,sql_dimension)
         time.sleep(1)  # 等待 1 秒，確保 dimension 表建立完成
         self.execute_sql(db_name, sql_fact)
-    
+        
     def connect(self):
         # 对密码进行 URL 编码
-        password = urllib.parse.quote_plus('Sql@1031')
+        # password = urllib.parse.quote_plus('test')
         # 创建 SQLAlchemy 引擎
-        db_name = "job_db"
+        # db_name = "job_db"
         # 创建 SQLAlchemy 引擎
-        engine = create_engine(f'mysql+mysqlconnector://root:{password}@localhost:3306/{db_name}')
+        engine = create_engine(self.mysql_url)
         return engine
 
     # 先從NoSQL抓資料dataframe
-    def save_sql(self, data_lake:DataLake):
-        # self.df_no_sql = data_lake.load_latest()
-        self.df_no_sql = data_lake.load_all()
-
-        # 將最新資料列名重命名為與目標表相匹配的名稱
-        df_new = self.df_no_sql.rename(columns=translation_dict)
-        # 將資料更新至 dimension table
-        self.update_all_dimension(df_new)
-        # 將資料更新至 fact table
-        self.update_fact_sql(df_new, "job_info")
+    def save_sql(self):
+        if self.data_lake is not None:
+            # self.df_no_sql = data_lake.load_latest()
+            self.df_no_sql = self.data_lake.load_all()
+    
+            # 將最新資料列名重命名為與目標表相匹配的名稱
+            df_new = self.df_no_sql.rename(columns=translation_dict)
+            # 將資料更新至 dimension table
+            self.update_all_dimension(df_new)
+            # 將資料更新至 fact table
+            self.update_fact_sql(df_new, "job_info")
+        else:
+            print("Please run initial method")
 
     def update_all_dimension(self, df_new):
         # 將資料更新至 dimension table (data, selected_columns, column_old, column_new)
@@ -68,7 +91,7 @@ class DataWarehouse(metaclass=SingletonMeta):
         rename = {"company":"company_name"}
         id_name = ["company_id","company_name","company_link"]
         self.update_dimension_sql(df_new, table_name, selected_columns, rename, id_name)
-
+        
         table_name = "industry"
         selected_columns = ['industry_id', 'industry']
         rename = {"industry":"industry_name"}
@@ -113,6 +136,41 @@ class DataWarehouse(metaclass=SingletonMeta):
         self.one_column_sql(df_new, "available")
         self.one_column_sql(df_new, "quantity")
 
+
+    def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
+         # 讀取目標表的資料,寫入dimention table
+        # df_new[selected_columns] = df_new[selected_columns].str.strip()
+
+        df_new = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
+        # 欄位重新命名
+        df_new = df_new.rename(columns = rename)
+        # 儲存至sql (排除重複的id_name)
+        self.insert_sql(df_new, table_name, id_name)    
+
+    # 需要修正 2025.05.04
+    def insert_sql(self, selected_columns, table_name, id_name):
+        
+         # 讀取目標表的資料
+        existing_data = self.read_sql(table_name)
+        existing_data = existing_data[id_name]
+        
+        # 檢查要寫入的資料是否已存在於目標表中
+        df_merge = pd.merge(selected_columns, existing_data, on=id_name, how="left", indicator=True)
+        df_insert = df_merge[df_merge['_merge'] == 'left_only']
+        df_insert = df_insert.drop('_merge', axis=1)
+
+        # 如果有不重複的值，將其寫入目標表
+        if not df_insert.empty:
+            df_insert.to_sql(name=table_name, con=self.engine, if_exists='append', index=False)
+            print(f"更新表格:{table_name},寫入{len(df_insert)}筆")
+        else:
+            print(f"無須更新:{table_name}")
+
+    
+    def read_sql(self, table_name):
+        existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)
+        return existing_data
+        
     def update_fact_sql(self, df_new, table_name):
         df_new.reset_index(inplace=True)
         df_new.rename(columns={'id': 'job_id'}, inplace=True)
@@ -216,41 +274,10 @@ class DataWarehouse(metaclass=SingletonMeta):
         id_name = ["job_id", f"{item_name}"]
         self.split_list_sql(df_new, table_name, selected_column, column_name , id_name)
                       
-    def update_dimension_sql(self, df_new, table_name, selected_columns, rename, id_name):
-         # 讀取目標表的資料,寫入dimention table
-        # df_new[selected_columns] = df_new[selected_columns].str.strip()
-
-        df_new = df_new[selected_columns].drop_duplicates().reset_index(drop=True)
-        # 欄位重新命名
-        df_new = df_new.rename(columns = rename)
-        # 儲存至sql (排除重複的id)
-        self.insert_sql(df_new, table_name, id_name)    
-
-    # 需要修正 2025.05.04
-    def insert_sql(self, selected_columns, table_name, id_name):
-        
-         # 讀取目標表的資料
-        existing_data = self.read_sql(table_name)
-        existing_data = existing_data[id_name]
-
-        # 檢查要寫入的資料是否已存在於目標表中
-        df_merge = pd.merge(selected_columns, existing_data, on=id_name, how="left", indicator=True)
-        df_insert = df_merge[df_merge['_merge'] == 'left_only']
-        df_insert = df_insert.drop('_merge', axis=1)
-
-        # 如果有不重複的值，將其寫入目標表
-        if not df_insert.empty:
-            df_insert.to_sql(name=table_name, con=self.engine, if_exists='append', index=False)
-            print(f"更新表格:{table_name},寫入{len(df_insert)}筆")
-        else:
-            print(f"無須更新:{table_name}")
-            
-    def read_sql(self, table_name):
-        existing_data = pd.read_sql(f'SELECT * FROM {table_name}', con=self.engine)
-        return existing_data
-        
+    
     # create db
     def createDB(self, db_name):
+        print(self.host,self.user,self.password, self.port)
         connection = mysql.connector.connect(
             host=self.host,
             user=self.user,
@@ -282,12 +309,12 @@ class DataWarehouse(metaclass=SingletonMeta):
         connection.close()
     
 
-    
-    # 讀取資料夾中的sql檔案
     def read_sql_file(self):
         try:
-            # SQL 文件所在的目录路径
-            sql_directory = 'sql'
+            # 取得目前檔案所在的目錄
+            current_dir = os.path.dirname(__file__)
+            # SQL 文件所在的目錄路徑
+            sql_directory = os.path.join(current_dir, 'sql')
             sql_script = {}
             # 讀取 SQL 檔案
             # 获取目录中所有的 SQL 文件
@@ -302,14 +329,33 @@ class DataWarehouse(metaclass=SingletonMeta):
         except Exception as e:
             print(f"Error reading SQL script from {sql_directory}: {e}")
             return None
+    # # 讀取資料夾中的sql檔案
+    # def read_sql_file(self):
+    #     try:
+    #         # SQL 文件所在的目录路径
+    #         sql_directory = 'sql'
+    #         sql_script = {}
+    #         # 讀取 SQL 檔案
+    #         # 获取目录中所有的 SQL 文件
+    #         sql_files = [f for f in os.listdir(sql_directory) if f.endswith('.sql')]
+    #         for file_name in sql_files:
+    #             sql_file_path = os.path.join(sql_directory, file_name)
+    #             with open(sql_file_path, 'r') as f:
+    #                 sql_content = f.read()
+    #                 sql_script[file_name] = sql_content
+    #         self.sql_script = sql_script
+    
+    #     except Exception as e:
+    #         print(f"Error reading SQL script from {sql_directory}: {e}")
+    #         return None
 
     # 執行sql內容
-    def execute_sql(selfk, db_name, sql_script):
+    def execute_sql(self, db_name, sql_script):
         connection = mysql.connector.connect(
-            host="localhost",
-            user = "root",
-            password = "Sql@1031",
-            port = 3306,
+            host=self.host,
+            user = self.user,
+            password = self.password,
+            port = self.port,
             database = db_name
         )
     
