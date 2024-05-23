@@ -7,6 +7,9 @@ from config.search_params import get_filter_params
 from crawler104 import Crawler104
 from data_lake import DataLake
 from data_warehouse import DataWarehouse
+import pendulum
+
+local_tz = pendulum.timezone("Asia/Taipei")
 
 # 設定連線方式
 remote=True
@@ -92,8 +95,9 @@ def data_warehouse():
 
 with DAG(
     dag_id = 'data_pipeline_jobs104',
-    start_date = datetime(2024, 5, 19),
-    schedule_interval="0 19 * * *",  # 每天晚上19點執行一次
+    schedule_interval="0 12,19 * * *",  # 每天晚上19點執行一次
+    start_date=datetime(2024, 5, 19, tzinfo=local_tz),
+    catchup=False,
     default_args={
         'depends_on_past': False,
         # 'email': ['bonjour.luc@gmail.com'], #如果Task執行失敗的話，要寄信給哪些人的email
