@@ -64,14 +64,18 @@ To set up the project using Docker Compose, follow these steps:
   ```
 
 ## ETL Structure
-![image](https://github.com/Yidti/jobscan/assets/71652287/b7b5fdb1-480b-4adc-b5db-10c31c9ab4da)
+![image](https://github.com/Yidti/jobscan/assets/71652287/b79dfc64-3236-4828-991a-182b1353736e)
 ### Airflow Workflow
 ![image](https://github.com/Yidti/jobscan/assets/71652287/822a10ca-3720-448c-a539-ff9eff25831f)
-
 - **Web Crawler**: Search results list and details from 104.
 - **Export File**: Save data into an Excel file.
 - **Data Lake**: Store data into NoSQL (MongoDB).
 - **Data Warehouse**: Store data into SQL (MySQL).
+- **FastAPI**: Develop RESTful API for accessing job listing data.
+  
+  ```http://localhost:8888/docs```
+  ![image](https://github.com/Yidti/jobscan/assets/71652287/bb8c6de1-972b-4c5f-bd0a-aab3dc2381a0)
+
 - **EDA (Exploratory Data Analysis)**:
   - **Vertical Bar Chart**: Education
     ![Education Vertical Bar Chart](https://github.com/Yidti/jobscan/assets/71652287/727a4c91-f361-4732-a95e-b3f9464df0af)
