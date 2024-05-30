@@ -20,7 +20,7 @@ To set up the project using Docker Compose, follow these steps:
    - **MongoDB**: http://localhost:27018
    - **MySQL**: http://localhost:3308
    - **Selenium Chrome**: http://localhost:4444
-
+   - **FastAPI**: http://localhost:8888/docs
 
 ## Features
 ### Filter conditions need to be set in advance
@@ -73,7 +73,6 @@ To set up the project using Docker Compose, follow these steps:
 - **Data Warehouse**: Store data into SQL (MySQL).
 - **FastAPI**: Develop RESTful API for accessing job listing data.
   
-  ```http://localhost:8888/docs```
   ![image](https://github.com/Yidti/jobscan/assets/71652287/bb8c6de1-972b-4c5f-bd0a-aab3dc2381a0)
 
 - **EDA (Exploratory Data Analysis)**:
