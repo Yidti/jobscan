@@ -30,6 +30,17 @@ x-airflow-common:
       condition: service_healthy
 
 services:
+  # API
+  api:
+    build: ./api
+    ports:
+      - 8888:8888
+    hostname: "api"
+    restart: "no"
+    environment:
+      - TZ=Asia/Taipei
+    volumes:
+      - ./api:/api
   # 爬蟲用
   chrome:
     image: seleniarm/standalone-chromium:124.0

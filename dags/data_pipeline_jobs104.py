@@ -33,7 +33,7 @@ def get_crawler104():
     filter_params = get_filter_params(role, keyword, isnew, jobexp, mode, order, asc)
     # user & title
     user = "yidti"
-    title = "data_Engineer"
+    title = "data_engineer"
     # 執行jupyter的時候在本機,遠端Remote連到 Docker的Chrome執行
     crawler = Crawler104(filter_params, user, title, remote=remote, diff_container=diff_container)
 
